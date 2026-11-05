@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Employee In/Out & Late Tracker</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- HTML5-QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0c1322;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .scanner-active-ring {
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45);
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .live-dot {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-[#11192d]/95 backdrop-blur border-b border-slate-800/90 sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center space-x-3">
+      <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+        <i data-lucide="scan-face" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+          Smart Employee In/Out &amp; Late Tracker
+          <span id="header-sync-status" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 live-dot"></span> Multi-Device Live Sync
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400">Sheet ID: <span class="font-mono text-slate-300">117_aY6...ewKXg</span> • Sheet: <span class="text-blue-400 font-medium">EMP Details</span></p>
+      </div>
+    </div>
+
+    <!-- Live Clock & Top Navigation Buttons -->
+    <div class="flex items-center gap-2.5">
+      <div class="hidden sm:flex flex-col text-right pr-4 border-r border-slate-800">
+        <span id="current-clock" class="text-lg font-mono font-bold text-white tracking-wider">00:00:00 PM</span>
+        <span id="current-date" class="text-xs text-slate-400">Loading date...</span>
+      </div>
+
+      <button onclick="fetchCloudLogs(true)" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition" title="Fetch latest scans from other devices">
+        <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5 text-blue-400"></i>
+        <span>Sync All Devices</span>
+      </button>
+
+      <button onclick="toggleBulkModal(true)" class="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shadow-md shadow-emerald-600/25">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+        <span>Bulk Excel / CSV Import</span>
+      </button>
+
+      <button onclick="toggleShareModal(true)" class="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-semibold transition shadow-md shadow-blue-600/25">
+        <i data-lucide="share-2" class="w-4 h-4"></i>
+        <span>App Link</span>
+      </button>
+
+      <button onclick="toggleSettingsModal(true)" class="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-semibold transition">
+        <i data-lucide="settings" class="w-4 h-4 text-slate-400"></i>
+        <span>Shift &amp; Config</span>
+      </button>
+
+      <button onclick="toggleScriptModal(true)" class="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-700/50 rounded-xl text-sm font-semibold transition">
+        <i data-lucide="code-2" class="w-4 h-4 text-indigo-400"></i>
+        <span class="hidden md:inline">Apps Script Code</span>
+      </button>
+
+      <button onclick="exportLogsToCSV()" class="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shadow-md shadow-emerald-600/20">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span class="hidden sm:inline">Export Logs</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 space-y-6">
+
+    <!-- Overview Counters -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-[#11192d] rounded-2xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold tracking-wider uppercase text-slate-400">Total Scans Today</span>
+          <span class="p-2 rounded-xl bg-blue-500/10 text-blue-400"><i data-lucide="activity" class="w-4 h-4"></i></span>
+        </div>
+        <p id="stat-total-scans" class="text-3xl font-bold mt-2 text-white">0</p>
+        <div class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i> <span id="stat-unique-emp">0</span> Unique Employees
+        </div>
+      </div>
+
+      <div class="bg-[#11192d] rounded-2xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold tracking-wider uppercase text-emerald-400">On Time (IN)</span>
+          <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400"><i data-lucide="check-circle-2" class="w-4 h-4"></i></span>
+        </div>
+        <p id="stat-on-time" class="text-3xl font-bold mt-2 text-emerald-400">0</p>
+        <div class="text-[11px] text-slate-400 mt-1.5">Before Shift + Grace Cutoff</div>
+      </div>
+
+      <div class="bg-[#11192d] rounded-2xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold tracking-wider uppercase text-rose-400">Late Marked (IN)</span>
+          <span class="p-2 rounded-xl bg-rose-500/10 text-rose-400"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+        </div>
+        <p id="stat-late" class="text-3xl font-bold mt-2 text-rose-400">0</p>
+        <div class="text-[11px] text-rose-400/80 mt-1.5 font-medium">Exceeded Shift Start Window</div>
+      </div>
+
+      <div class="bg-[#11192d] rounded-2xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold tracking-wider uppercase text-amber-400">Currently Out / Break</span>
+          <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400"><i data-lucide="coffee" class="w-4 h-4"></i></span>
+        </div>
+        <p id="stat-out-break" class="text-3xl font-bold mt-2 text-amber-400">0</p>
+        <div class="text-[11px] text-slate-400 mt-1.5">Break Time Tracking Active</div>
+      </div>
+    </div>
+
+    <!-- Active Scanning Workstation Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Scanner Controls & Input Card -->
+      <div class="lg:col-span-7 bg-[#11192d] rounded-2xl border border-slate-800 p-5 lg:p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <!-- Scan Mode Header -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="align-justify" class="w-5 h-5 text-blue-400 rotate-90"></i>
+                Barcode / QR Code Gun Scanner
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Focus text box below. Scan gun automatically presses Enter after scan.</p>
+            </div>
+            <!-- Camera Toggle Button -->
+            <button id="toggle-camera-btn" onclick="toggleCameraScanner()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 flex items-center gap-1.5 transition">
+              <i data-lucide="camera" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span id="cam-btn-text">Open Device Camera</span>
+            </button>
+          </div>
+
+          <!-- Optional Camera Viewport Container -->
+          <div id="camera-reader-container" class="hidden my-4 p-3 bg-black/60 rounded-xl border border-dashed border-slate-700">
+            <div id="camera-reader" class="w-full max-w-sm mx-auto overflow-hidden rounded-lg"></div>
+            <p class="text-center text-xs text-slate-400 mt-2">Hold Employee Barcode or QR card in front of your camera</p>
+          </div>
+
+          <!-- Select Action Mode (IN, OUT BREAK, IN BREAK, OUT SHIFT) -->
+          <div class="mt-4">
+            <label class="block text-[11px] font-bold uppercase text-slate-400 tracking-wider mb-2">Select Scan Action:</label>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <label class="cursor-pointer">
+                <input type="radio" name="scan-action" value="IN" checked class="peer sr-only" onchange="updateActionUI()">
+                <div class="py-2.5 px-3 rounded-xl border border-slate-800 bg-[#0c1322] text-center peer-checked:bg-emerald-600 peer-checked:border-emerald-500 peer-checked:text-white hover:bg-slate-800 transition">
+                  <div class="text-xs font-bold flex items-center justify-center gap-1.5"><i data-lucide="arrow-right-to-line" class="w-3.5 h-3.5"></i> IN (Shift)</div>
+                </div>
+              </label>
+
+              <label class="cursor-pointer">
+                <input type="radio" name="scan-action" value="OUT_BREAK" class="peer sr-only" onchange="updateActionUI()">
+                <div class="py-2.5 px-3 rounded-xl border border-slate-800 bg-[#0c1322] text-center peer-checked:bg-amber-600 peer-checked:border-amber-500 peer-checked:text-white hover:bg-slate-800 transition">
+                  <div class="text-xs font-bold flex items-center justify-center gap-1.5"><i data-lucide="coffee" class="w-3.5 h-3.5"></i> OUT (Break)</div>
+                </div>
+              </label>
+
+              <label class="cursor-pointer">
+                <input type="radio" name="scan-action" value="IN_BREAK" class="peer sr-only" onchange="updateActionUI()">
+                <div class="py-2.5 px-3 rounded-xl border border-slate-800 bg-[#0c1322] text-center peer-checked:bg-blue-600 peer-checked:border-blue-500 peer-checked:text-white hover:bg-slate-800 transition">
+                  <div class="text-xs font-bold flex items-center justify-center gap-1.5"><i data-lucide="undo-2" class="w-3.5 h-3.5"></i> IN (Return)</div>
+                </div>
+              </label>
+
+              <label class="cursor-pointer">
+                <input type="radio" name="scan-action" value="OUT_SHIFT" class="peer sr-only" onchange="updateActionUI()">
+                <div class="py-2.5 px-3 rounded-xl border border-slate-800 bg-[#0c1322] text-center peer-checked:bg-purple-600 peer-checked:border-purple-500 peer-checked:text-white hover:bg-slate-800 transition">
+                  <div class="text-xs font-bold flex items-center justify-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> OUT (Day End)</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Big Input Box for Barcode Gun or Manual Typing -->
+          <div class="mt-5">
+            <label for="barcode-input" class="flex justify-between items-center text-xs font-medium text-slate-300 mb-1.5">
+              <span>Employee ID / HRMS / Workforce Code Scanner Input</span>
+              <span class="text-blue-400 flex items-center gap-1.5 font-mono text-[11px]">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 live-dot"></span> Ready to scan
+              </span>
+            </label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="scan" class="w-5 h-5 text-blue-400"></i>
+              </div>
+              <input
+                type="text"
+                id="barcode-input"
+                placeholder="Scan Barcode here or type ID (e.g. HR001, WF-104)..."
+                autocomplete="off"
+                autofocus
+                class="w-full pl-11 pr-24 py-3.5 bg-[#090f1a] border-2 border-blue-600/70 focus:border-blue-500 focus:outline-none rounded-xl text-white font-mono text-base placeholder-slate-500 scanner-active-ring transition"
+                onkeydown="handleScanKeydown(event)"
+              />
+              <button
+                type="button"
+                onclick="processScanInput()"
+                class="absolute right-2 top-2 bottom-2 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition shadow">
+                <span>Enter</span>
+                <i data-lucide="corner-down-left" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-2">
+              💡 <b>Pro Tip:</b> Gun scanner automatically scans and fires Enter. Keep cursor focused in this box for continuous non-stop scanning.
+            </p>
+          </div>
+        </div>
+
+        <!-- Shift Rule Banner -->
+        <div class="mt-5 p-3.5 rounded-xl bg-[#090f1a] border border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2">
+          <div class="flex items-center gap-2">
+            <span class="p-1 rounded-lg bg-blue-500/20 text-blue-400"><i data-lucide="clock" class="w-3.5 h-3.5"></i></span>
+            <span>Shift Target: <b id="rule-shift-time" class="text-white font-mono">09:30 AM</b></span>
+            <span class="text-slate-600">|</span>
+            <span>Grace: <b id="rule-grace-time" class="text-white font-mono">15 Mins</b></span>
+          </div>
+          <div>
+            Late starts after: <span id="rule-late-time" class="text-rose-400 font-mono font-bold">09:45 AM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Last Scanned Employee Preview Card -->
+      <div class="lg:col-span-5 bg-[#11192d] rounded-2xl border border-slate-800 p-5 lg:p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <span class="text-[11px] font-bold uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i> Instant Scan Result
+            </span>
+            <span id="scan-feedback-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+              Awaiting Scan
+            </span>
+          </div>
+
+          <!-- Employee Card Box -->
+          <div id="last-scanned-container" class="mt-4">
+            <div id="empty-scan-state" class="text-center py-10 px-4 text-slate-500 flex flex-col items-center justify-center">
+              <div class="w-14 h-14 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 mb-3">
+                <i data-lucide="scan-line" class="w-7 h-7"></i>
+              </div>
+              <p class="text-sm font-semibold text-slate-200">Koi bhi Employee Barcode scan karein</p>
+              <p class="text-xs text-slate-400 max-w-xs mt-1 leading-relaxed">Employee details, photo avatar, late calculation aur break timing yahan real-time me display hogi.</p>
+            </div>
+
+            <!-- Populated Card -->
+            <div id="employee-card-details" class="hidden space-y-4">
+              <div class="flex items-center gap-3.5">
+                <div id="emp-avatar" class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-lg flex items-center justify-center shadow-md">
+                  NA
+                </div>
+                <div>
+                  <h3 id="emp-name" class="text-lg font-bold text-white tracking-tight">Employee Name</h3>
+                  <p id="emp-role-dept" class="text-xs text-slate-400">Designation • Department</p>
+                  <p class="text-[11px] font-mono text-blue-400 mt-0.5">Code: <span id="emp-code">--</span></p>
+                </div>
+              </div>
+
+              <!-- Information Grid -->
+              <div class="grid grid-cols-2 gap-2 text-xs pt-2">
+                <div class="bg-[#090f1a] p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-500 text-[10px] uppercase block font-semibold">Location / Site</span>
+                  <span id="emp-location" class="font-medium text-white truncate block">Head Office</span>
+                </div>
+                <div class="bg-[#090f1a] p-2.5 rounded-lg border border-slate-800">
+                  <span class="text-slate-500 text-[10px] uppercase block font-semibold">Contact / Phone</span>
+                  <span id="emp-phone" class="font-medium text-white font-mono truncate block">+91 9876543210</span>
+                </div>
+              </div>
+
+              <!-- Calculation Status Highlights -->
+              <div id="status-alert-box" class="p-3.5 rounded-xl border flex items-start gap-3 bg-[#090f1a] border-slate-800">
+                <div id="status-icon-wrap" class="mt-0.5 p-1 rounded-lg bg-blue-500/20 text-blue-400">
+                  <i data-lucide="info" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 id="status-headline" class="text-xs font-bold text-white">Punch Registered</h4>
+                  <p id="status-description" class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                    Punch logged successfully at 00:00:00
+                  </p>
+                </div>
+              </div>
+
+              <!-- Break Calculation Details if applicable -->
+              <div id="break-alert-box" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
+                <div class="flex items-center gap-2 font-semibold">
+                  <i data-lucide="timer" class="w-4 h-4 text-amber-400"></i>
+                  <span>Break Return Calculated:</span>
+                </div>
+                <p id="break-calculation-text" class="mt-1 text-slate-300 text-[11px]">
+                  Employee returned after <b class="text-amber-300 font-bold">0 mins</b>.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Direct Sheet Status Indicator -->
+    <div class="pt-4 border-t border-slate-800 mt-4 flex items-center justify-between text-[11px] text-slate-400">
+      <div class="flex items-center gap-1.5">
+        <span id="cloud-sync-indicator" class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span id="cloud-sync-text">Checking Cloud Sync...</span>
+      </div>
+      <button onclick="checkSyncSetupStatus()" class="text-blue-400 hover:underline text-[11px] flex items-center gap-1">
+        <i data-lucide="link" class="w-3 h-3"></i> Setup / Fix Cloud Link
+      </button>
+    </div>
+  </div>
+</div>
+          <span class="text-slate-500">Auto-logging to 'Attendance Logs'</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Activity Logs & Search Table -->
+    <div class="bg-[#11192d] rounded-2xl border border-slate-800 p-5 shadow-xl">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="list-ordered" class="w-5 h-5 text-indigo-400"></i>
+            Real-Time Attendance Log History
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Live feed of all scans with timing, late markings &amp; break duration calculations.</p>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400"></i>
+            <input
+              type="text"
+              id="table-search"
+              oninput="filterLogsTable()"
+              placeholder="Search Name or Code..."
+              class="pl-8 pr-3 py-1.5 bg-[#090f1a] border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <select id="table-filter-action" onchange="filterLogsTable()" class="px-2.5 py-1.5 bg-[#090f1a] border border-slate-700 rounded-xl text-xs text-slate-300 focus:outline-none">
+            <option value="ALL">All Actions</option>
+            <option value="IN">IN (Shift)</option>
+            <option value="OUT_BREAK">OUT (Break)</option>
+            <option value="IN_BREAK">IN (Return)</option>
+            <option value="OUT_SHIFT">OUT (Shift End)</option>
+          </select>
+
+          <select id="table-filter-status" onchange="filterLogsTable()" class="px-2.5 py-1.5 bg-[#090f1a] border border-slate-700 rounded-xl text-xs text-slate-300 focus:outline-none">
+            <option value="ALL">All Statuses</option>
+            <option value="ON_TIME">On Time Only</option>
+            <option value="LATE">Late Marked Only</option>
+          </select>
+
+          <button onclick="clearAllLogs()" class="px-2.5 py-1.5 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition" title="Clear current session table">
+            Clear Table
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Viewport -->
+      <div class="overflow-x-auto mt-4">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-[#090f1a] text-slate-400 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-800">
+              <th class="py-3 px-3">#</th>
+              <th class="py-3 px-3">Scan Time &amp; Date</th>
+              <th class="py-3 px-3">Emp ID / HRMS</th>
+              <th class="py-3 px-3">Employee Name</th>
+              <th class="py-3 px-3">Department &amp; Role</th>
+              <th class="py-3 px-3">Action</th>
+              <th class="py-3 px-3">Late Calculation</th>
+              <th class="py-3 px-3">Break Duration</th>
+              <th class="py-3 px-3 text-right">Sheet Sync</th>
+            </tr>
+          </thead>
+          <tbody id="logs-table-body" class="divide-y divide-slate-800/80 font-normal text-slate-300">
+            <!-- Dynamic rows injected here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination / Footer Counter -->
+      <div class="pt-3 mt-3 border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400">
+        <div id="table-count-label">Showing 0 of 0 entries</div>
+        <div class="text-[11px] text-slate-500">Auto-saved locally and synchronized with Google Apps Script Webhook</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Bulk Excel / Sheet Paste & Import Modal -->
+  <div id="bulk-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#11192d] border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
+            Bulk Employee Import (Excel / Sheet Copy-Paste)
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Google Sheet / Excel se direct rows copy karke yahan paste karein. Permanent save rahega.</p>
+        </div>
+        <button onclick="toggleBulkModal(false)" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto py-4 space-y-4 text-xs text-slate-300">
+        <!-- Direct Paste Area -->
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <label for="bulk-paste-input" class="font-semibold text-white">Paste Excel / Google Sheet Rows Here:</label>
+            <span class="text-[11px] text-emerald-400 font-mono">Tab / Comma separated auto-detected</span>
+          </div>
+          <textarea
+            id="bulk-paste-input"
+            rows="8"
+            placeholder="Excel ya Google Sheet se rows copy karke direct yahan Ctrl+V karein:&#10;&#10;HR101	Rahul Sharma	Senior Executive	Operations	9876543210&#10;HR102	Priya Patel	Quality Analyst	Quality	9811223344&#10;XYZ-99	Amit Kumar	Supervisor	Logistics	9988776655"
+            class="w-full bg-[#090f1a] border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none placeholder-slate-600 resize-y"
+            oninput="previewBulkCount()"
+          ></textarea>
+          <p class="text-[11px] text-slate-400 mt-1">
+            Format: <b>HRMS / ID Code</b> [Tab / Comma] <b>Name</b> [Tab / Comma] <b>Designation</b> [Tab / Comma] <b>Department</b> [Tab / Comma] <b>Mobile</b>. (Header row hogi toh auto ignore kar dega).
+          </p>
+        </div>
+
+        <!-- File Upload Option -->
+        <div class="p-3 bg-[#090f1a] rounded-xl border border-dashed border-slate-700 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="upload-cloud" class="w-5 h-5 text-blue-400"></i>
+            <div>
+              <p class="font-semibold text-white">Ya CSV file choose karein</p>
+              <p class="text-[11px] text-slate-400">Agar aapke paas CSV file export hai toh direct upload karein</p>
+            </div>
+          </div>
+          <label class="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-white font-medium text-xs transition">
+            Browse File
+            <input type="file" id="bulk-file-input" accept=".csv, .txt, .tsv" class="hidden" onchange="handleBulkFileUpload(event)">
+          </label>
+        </div>
+
+        <!-- Status & Stats -->
+        <div class="flex items-center justify-between p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+          <div>
+            <span class="text-slate-400">Currently Saved Employees:</span>
+            <b id="saved-emp-count" class="text-white ml-1 font-mono">0</b>
+          </div>
+          <div>
+            <span class="text-slate-400">Rows Detected in Box:</span>
+            <b id="detected-emp-count" class="text-emerald-400 ml-1 font-mono">0</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-700 flex items-center justify-between">
+        <button onclick="clearCustomEmployees()" class="text-rose-400 hover:text-rose-300 text-xs font-semibold">
+          Reset Saved Employees
+        </button>
+        <div class="flex gap-2">
+          <button onclick="toggleBulkModal(false)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">
+            Cancel
+          </button>
+          <button onclick="saveBulkEmployees()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow">
+            Save All Employees Permanently
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shift & Webhook Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#11192d] border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-700">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-blue-400"></i>
+          Attendance Shift &amp; Sheet Integration
+        </h3>
+        <button onclick="toggleSettingsModal(false)" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Settings Form Controls -->
+      <div class="space-y-4 py-4 text-xs text-slate-300">
+        <div>
+          <label for="setting-shift-time" class="block font-semibold text-white mb-1">Standard Shift Start Time</label>
+          <input
+            type="time"
+            id="setting-shift-time"
+            value="09:30"
+            class="w-full bg-[#090f1a] border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-blue-500 focus:outline-none"
+          />
+          <p class="text-[11px] text-slate-400 mt-1">Normal target reporting time for day shift.</p>
+        </div>
+
+        <div>
+          <label for="setting-grace-mins" class="block font-semibold text-white mb-1">Grace Period (Minutes)</label>
+          <input
+            type="number"
+            id="setting-grace-mins"
+            value="15"
+            min="0"
+            max="120"
+            class="w-full bg-[#090f1a] border border-slate-700 rounded-xl p-2.5 text-white font-mono focus:border-blue-500 focus:outline-none"
+          />
+          <p class="text-[11px] text-slate-400 mt-1">Employees scanning after Shift Time + Grace Period will be marked as Late.</p>
+        </div>
+
+        <div>
+          <label for="setting-webhook-url" class="block font-semibold text-emerald-400 mb-1 flex items-center justify-between">
+            <span>Central Apps Script Web App URL (*REQUIRED FOR MULTI-DEVICE)</span>
+            <span class="text-[10px] text-slate-400">Paste once, syncs everywhere</span>
+          </label>
+          <input
+            type="url"
+            id="setting-webhook-url"
+            placeholder="https://script.google.com/macros/s/.../exec"
+            class="w-full bg-[#090f1a] border-2 border-emerald-500/60 rounded-xl p-2.5 text-white font-mono text-xs focus:border-emerald-400 focus:outline-none"
+          />
+          <p class="text-[11px] text-slate-400 mt-1">
+            ⚠️ <b>Dono systems me yahi same URL hona chahiye.</b> Iske bina scan sirf usi local computer par rehta hai.
+          </p>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-700 flex justify-end gap-2">
+        <button onclick="toggleSettingsModal(false)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">
+          Cancel
+        </button>
+        <button onclick="saveSettings()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow">
+          Save Configuration
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Link & Hosting Instructions Modal -->
+  <div id="share-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#11192d] border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="share-2" class="w-5 h-5 text-blue-400"></i>
+          Share App Link with Others
+        </h3>
+        <button onclick="toggleShareModal(false)" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 py-4 text-xs text-slate-300">
+        <div>
+          <label class="block font-semibold text-white mb-1.5">Shareable Web App Link:</label>
+          <div class="flex items-center gap-2">
+            <input type="text" id="share-url-input" readonly value="" class="w-full bg-[#090f1a] border border-slate-700 rounded-xl p-2.5 text-white font-mono text-xs select-all">
+            <button onclick="copyShareLink()" id="btn-copy-share" class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">Yeh link kisi ko bhi bhejein, woh kisi bhi browser/mobile me open karke scanner chala sakte hain.</p>
+        </div>
+
+        <!-- Quick Share Options -->
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <button onclick="shareViaWhatsApp()" class="flex items-center justify-center gap-2 p-3 bg-emerald-700/60 hover:bg-emerald-600 border border-emerald-600 rounded-xl text-white font-semibold transition">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Share on WhatsApp</span>
+          </button>
+          <button onclick="openLinkDirect()" class="flex items-center justify-center gap-2 p-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-white font-semibold transition">
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+            <span>Open in New Tab</span>
+          </button>
+        </div>
+
+        <div class="p-3.5 bg-[#090f1a] rounded-xl border border-slate-800 space-y-1 text-slate-300">
+          <div class="font-bold text-amber-400 flex items-center gap-1.5">
+            <i data-lucide="users" class="w-4 h-4"></i> Dusre System Par Kaise Chalega:
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            1. Yeh link aap apne guard, team ya doosre computer par bhej dijiye.<br>
+            2. Wahan koi login ki zaroorat nahi hai, direct screen khulegi aur gun scanner ya phone camera se scan chalu ho jayega.<br>
+            3. Har scan central sheet me save hoga aur aapko apne system par real-time dikhega.
+          </p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-700 flex justify-end">
+        <button onclick="toggleShareModal(false)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apps Script Code & Deployment Guide Modal -->
+  <div id="script-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-[#11192d] border border-slate-700 rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-700">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="code-2" class="w-5 h-5 text-indigo-400"></i>
+            Google Apps Script Code (Sheet ID: 117_aY6...)
+          </h3>
+          <p class="text-xs text-slate-400">Copy this code into your Google Sheet's Extensions &gt; Apps Script.</p>
+        </div>
+        <button onclick="toggleScriptModal(false)" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto py-3 space-y-4 text-xs text-slate-300">
+        <div>
+          <h4 class="font-bold text-white mb-1">Step-by-Step Setup Guide:</h4>
+          <ol class="list-decimal list-inside space-y-1 text-slate-300 text-[11px]">
+            <li>Open your Google Sheet: <a href="https://docs.google.com/spreadsheets/d/117_aY6-I5Fl26qMnyfE7H1d9vRGyp4an3vbr0hewKXg/edit" target="_blank" class="text-blue-400 underline">Open Sheet</a></li>
+            <li>Go to top menu: <b>Extensions &gt; Apps Script</b>.</li>
+            <li>Replace everything in `Code.gs` with the snippet below and click <b>Save (Ctrl + S)</b>.</li>
+            <li>Click <b>Deploy &gt; New deployment</b> (top right).</li>
+            <li>Select type: <b>Web app</b>.</li>
+            <li>Set <i>"Execute as"</i> = <b>Me</b>, and <i>"Who has access"</i> = <b>Anyone</b>.</li>
+            <li>Click <b>Deploy</b>, copy the generated Web App URL, and paste it into the <b>Shift &amp; Config</b> settings of this app!</li>
+          </ol>
+        </div>
+
+        <div class="relative">
+          <div class="flex justify-between items-center bg-[#090f1a] px-3.5 py-2 rounded-t-xl border-t border-x border-slate-700">
+            <span class="text-xs font-mono text-slate-400">Code.gs</span>
+            <button onclick="copyAppsScriptCode()" id="copy-btn" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-medium flex items-center gap-1">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy Code</span>
+            </button>
+          </div>
+          <pre id="apps-script-code" class="bg-black/80 p-3.5 rounded-b-xl border border-slate-700 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
+function getTargetSpreadsheet() {
+  var SHEET_ID = "117_aY6-I5Fl26qMnyfE7H1d9vRGyp4an3vbr0hewKXg";
+  try {
+    return SpreadsheetApp.openById(SHEET_ID);
+  } catch(e) {
+    return SpreadsheetApp.getActiveSpreadsheet();
+  }
+}
+
+function getLogSheet() {
+  var ss = getTargetSpreadsheet();
+  var logSheetName = "Attendance Logs";
+  var logSheet = ss.getSheetByName(logSheetName);
+
+  if (!logSheet) {
+    logSheet = ss.insertSheet(logSheetName);
+    logSheet.appendRow([
+      "ID", "Timestamp", "Date", "Time", "Employee ID / HRMS",
+      "Workforce Code", "Employee Name", "Department", "Designation",
+      "Action", "Late Status", "Late Minutes", "Break Duration (Mins)", "Raw Data Dump"
+    ]);
+    logSheet.getRange("A1:N1").setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+    logSheet.setFrozenRows(1);
+  }
+  return logSheet;
+}
+
+function doPost(e) {
+  return handleIncomingLog(e);
+}
+
+function doGet(e) {
+  // Support appending via GET query param (bulletproof fallback for browser CORS)
+  if (e && e.parameter && e.parameter.payload) {
+    return handleIncomingLog(e);
+  }
+
+  try {
+    var logSheet = getLogSheet();
+    var data = logSheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      return ContentService.createTextOutput(JSON.stringify({ logs: [] }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var logs = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[0] && !row[4]) continue;
+
+      logs.push({
+        id: String(row[0] || ("LOG-" + i)),
+        timestamp: row[1] ? new Date(row[1]).toISOString() : new Date().toISOString(),
+        date: String(row[2] || ""),
+        time: String(row[3] || ""),
+        hrmsCode: String(row[4] || ""),
+        workforceCode: String(row[5] || ""),
+        name: String(row[6] || ""),
+        dept: String(row[7] || ""),
+        designation: String(row[8] || ""),
+        action: String(row[9] || "IN"),
+        isLate: String(row[10]) === "LATE",
+        lateMinutes: Number(row[11]) || 0,
+        breakDurationMinutes: Number(row[12]) || 0,
+        syncStatus: "Synced"
+      });
+    }
+
+    // Newest first for UI display
+    logs.reverse();
+
+    return ContentService.createTextOutput(JSON.stringify({ logs: logs }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.toString(), logs: [] }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function handleIncomingLog(e) {
+  try {
+    var raw = "";
+    if (e && e.postData && e.postData.contents) {
+      raw = e.postData.contents;
+    } else if (e && e.parameter && e.parameter.payload) {
+      raw = e.parameter.payload;
+    }
+
+    if (!raw) {
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No data" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var data = typeof raw === "string" ? JSON.parse(raw) : raw;
+    var logSheet = getLogSheet();
+
+    if (data.action === "CLEAR_ALL_LOGS") {
+      var lastRow = logSheet.getLastRow();
+      if (lastRow > 1) {
+        logSheet.deleteRows(2, lastRow - 1);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Cleared" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var now = new Date();
+    logSheet.appendRow([
+      data.id || ("LOG-" + now.getTime()),
+      now,
+      data.date || Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd"),
+      data.time || Utilities.formatDate(now, Session.getScriptTimeZone(), "hh:mm:ss a"),
+      data.hrmsCode || "",
+      data.workforceCode || "",
+      data.name || "Unknown",
+      data.dept || "",
+      data.designation || "",
+      data.action || "IN",
+      data.isLate ? "LATE" : "ON_TIME",
+      data.lateMinutes || 0,
+      data.breakDurationMinutes || 0,
+      JSON.stringify(data)
+    ]);
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+  </pre>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-700 flex justify-end">
+        <button onclick="toggleScriptModal(false)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 max-w-sm bg-[#11192d] border border-slate-700 text-white p-4 rounded-xl shadow-2xl flex items-center gap-3">
+    <div id="toast-icon" class="text-blue-400">
+      <i data-lucide="info" class="w-5 h-5"></i>
+    </div>
+    <div class="flex-1">
+      <p id="toast-title" class="text-xs font-bold text-white">Notification</p>
+      <p id="toast-msg" class="text-[11px] text-slate-300">Message content here</p>
+    </div>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    /* ============================================================
+       1. PERMANENT EMPLOYEES DATABASE (Stored in LocalStorage)
+    ============================================================ */
+    const DEFAULT_EMPLOYEES = [
+      {
+        hrmsCode: "HR101",
+        workforceCode: "WF-5001",
+        name: "Rahul Sharma",
+        designation: "Senior Executive",
+        dept: "Operations",
+        role: "Team Lead",
+        mob: "9876543210",
+        location: "Warehouse Delhi",
+        status: "Active"
+      },
+      {
+        hrmsCode: "HR102",
+        workforceCode: "WF-5002",
+        name: "Pooja Verma",
+        designation: "Quality Analyst",
+        dept: "Quality Assurance",
+        role: "Associate",
+        mob: "9811223344",
+        location: "Warehouse Delhi",
+        status: "Active"
+      },
+      {
+        hrmsCode: "HR103",
+        workforceCode: "WF-5003",
+        name: "Amit Patel",
+        designation: "Forklift Operator",
+        dept: "Logistics",
+        role: "Operator",
+        mob: "9922334455",
+        location: "Noida Hub",
+        status: "Active"
+      },
+      {
+        hrmsCode: "HR104",
+        workforceCode: "WF-5004",
+        name: "Deepak Kumar",
+        designation: "Inventory Specialist",
+        dept: "Supply Chain",
+        role: "Coordinator",
+        mob: "9733445566",
+        location: "Gurugram Plant",
+        status: "Active"
+      },
+      {
+        hrmsCode: "HR105",
+        workforceCode: "WF-5005",
+        name: "Sneha Nair",
+        designation: "HR Officer",
+        dept: "Human Resources",
+        role: "HR Executive",
+        mob: "9644556677",
+        location: "Head Office",
+        status: "Active"
+      }
+    ];
+
+    // Load permanently saved employees or fallback to defaults
+    let EMPLOYEE_DB = JSON.parse(localStorage.getItem("permanent_employee_db") || "null");
+    if (!EMPLOYEE_DB || !Array.isArray(EMPLOYEE_DB) || EMPLOYEE_DB.length === 0) {
+      EMPLOYEE_DB = DEFAULT_EMPLOYEES;
+      localStorage.setItem("permanent_employee_db", JSON.stringify(EMPLOYEE_DB));
+    }
+
+    /* ============================================================
+       2. CONFIGURATION & STATE
+    ============================================================ */
+    let config = {
+      shiftStartTime: "09:30",
+      graceMinutes: 15,
+      webhookUrl: localStorage.getItem("att_webhook_url") || ""
+    };
+
+    const savedConfig = localStorage.getItem("att_config");
+    if (savedConfig) {
+      try {
+        config = { ...config, ...JSON.parse(savedConfig) };
+      } catch (e) {
+        console.error("Config parse error", e);
+      }
+    }
+
+    // Attendance logs are permanently saved until explicitly cleared
+    let scanLogs = JSON.parse(localStorage.getItem("permanent_scan_logs") || "[]");
+    let html5QrScanner = null;
+    let isCameraActive = false;
+    let cloudSyncInterval = null;
+
+    /* ============================================================
+       3. INITIALIZATION & CLOCK
+    ============================================================ */
+    window.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      updateClock();
+      setInterval(updateClock, 1000);
+      refreshRuleLabels();
+      renderLogsTable();
+      updateStatCards();
+      updateSavedEmployeeCount();
+
+      focusScannerInput();
+
+      document.addEventListener("click", (e) => {
+        const isInput = e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#settings-modal') || e.target.closest('#script-modal') || e.target.closest('#bulk-modal') || e.target.closest('#share-modal');
+        if (!isInput) {
+          focusScannerInput();
+        }
+      });
+
+      const webhookInput = document.getElementById("setting-webhook-url");
+      const shiftInput = document.getElementById("setting-shift-time");
+      const graceInput = document.getElementById("setting-grace-mins");
+
+      if (webhookInput) webhookInput.value = config.webhookUrl || "";
+      if (shiftInput) shiftInput.value = config.shiftStartTime || "09:30";
+      if (graceInput) graceInput.value = config.graceMinutes ?? 15;
+
+      // Start automatic cloud sync across all devices
+      if (config.webhookUrl) {
+        fetchCloudLogs();
+        cloudSyncInterval = setInterval(fetchCloudLogs, 8000); // Poll every 8s for live multi-system scans
+      }
+    });
+
+    /* ============================================================
+       CENTRAL CLOUD MULTI-DEVICE SYNC ENGINE
+    ============================================================ */
+    function checkSyncSetupStatus() {
+      toggleSettingsModal(true);
+      const input = document.getElementById("setting-webhook-url");
+      if (input) input.focus();
+    }
+
+    async function fetchCloudLogs(isManual = false) {
+      const webhook = config.webhookUrl;
+      const syncDot = document.getElementById("cloud-sync-indicator");
+      const syncText = document.getElementById("cloud-sync-text");
+
+      if (!webhook || webhook.trim() === "") {
+        if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-amber-400";
+        if (syncText) syncText.innerText = "Local Mode (No Apps Script URL in Shift & Config)";
+        if (isManual) {
+          showToast("URL Missing", "Click 'Shift & Config' and paste your Apps Script URL.", "alert-triangle", "amber");
+          toggleSettingsModal(true);
+        }
+        return;
+      }
+
+      const refreshIcon = document.getElementById("refresh-icon");
+      if (refreshIcon) refreshIcon.classList.add("animate-spin");
+
+      try {
+        const response = await fetch(webhook, { method: "GET", cache: "no-store" });
+        const data = await response.json();
+
+        if (data && Array.isArray(data.logs)) {
+          // Sync successful: replace or merge
+          scanLogs = data.logs;
+          localStorage.setItem("permanent_scan_logs", JSON.stringify(scanLogs));
+          renderLogsTable();
+          updateStatCards();
+
+          if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-emerald-400";
+          if (syncText) syncText.innerText = "Live Cloud Sync Active (Multi-Device OK)";
+
+          if (isManual) {
+            showToast("Synced!", `${data.logs.length} scans synchronized from Central Sheet.`, "check-check", "emerald");
+          }
+        }
+      } catch (err) {
+        console.warn("Cloud pull error:", err);
+        if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-rose-400";
+        if (syncText) syncText.innerText = "Cloud Sync Error: Deploy Web App as 'Anyone'";
+        if (isManual) {
+          showToast("Sync Error", "Ensure Apps Script is deployed as Web App with access 'Anyone'.", "alert-circle", "rose");
+        }
+      } finally {
+        if (refreshIcon) {
+          setTimeout(() => refreshIcon.classList.remove("animate-spin"), 500);
+        }
+      }
+    }
+
+    function focusScannerInput() {
+      const input = document.getElementById("barcode-input");
+      if (input && document.activeElement !== input) {
+        input.focus();
+      }
+    }
+
+    function updateSavedEmployeeCount() {
+      const counter = document.getElementById("saved-emp-count");
+      if (counter) counter.innerText = EMPLOYEE_DB.length;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: true });
+      const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      
+      const clockEl = document.getElementById("current-clock");
+      const dateEl = document.getElementById("current-date");
+      if (clockEl) clockEl.innerText = timeStr;
+      if (dateEl) dateEl.innerText = dateStr;
+    }
+
+    function refreshRuleLabels() {
+      const [h, m] = config.shiftStartTime.split(":").map(Number);
+      const shiftDate = new Date();
+      shiftDate.setHours(h, m, 0, 0);
+
+      const lateDate = new Date(shiftDate.getTime() + config.graceMinutes * 60000);
+      const formatTime = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      document.getElementById("rule-shift-time").innerText = formatTime(shiftDate);
+      document.getElementById("rule-grace-time").innerText = config.graceMinutes + " Mins";
+      document.getElementById("rule-late-time").innerText = formatTime(lateDate);
+    }
+
+    /* ============================================================
+       4. SCANNER & ENTER KEY HANDLER
+    ============================================================ */
+    function handleScanKeydown(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        processScanInput();
+      }
+    }
+
+    function getSelectedAction() {
+      const checked = document.querySelector('input[name="scan-action"]:checked');
+      return checked ? checked.value : "IN";
+    }
+
+    function updateActionUI() {
+      focusScannerInput();
+    }
+
+    function processScanInput() {
+      const inputEl = document.getElementById("barcode-input");
+      const rawCode = inputEl.value.trim();
+
+      if (!rawCode) {
+        showToast("Scanner Error", "Please scan a barcode or enter an Employee ID.", "alert-circle", "rose");
+        return;
+      }
+
+      const action = getSelectedAction();
+      executeAttendanceLog(rawCode, action);
+
+      inputEl.value = "";
+      focusScannerInput();
+    }
+
+    /* ============================================================
+       5. CORE ATTENDANCE ENGINE (LATE & BREAK CALCULATION)
+    ============================================================ */
+    function executeAttendanceLog(rawCode, action) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: true });
+      const dateStr = now.toISOString().split("T")[0];
+
+      const cleanCode = rawCode.trim().toUpperCase();
+      let emp = EMPLOYEE_DB.find(e => 
+        (e.hrmsCode && e.hrmsCode.toUpperCase() === cleanCode) || 
+        (e.workforceCode && e.workforceCode.toUpperCase() === cleanCode)
+      );
+
+      // Support for ANY XYZ employee id format
+      if (!emp) {
+        emp = {
+          hrmsCode: cleanCode,
+          workforceCode: cleanCode,
+          name: "Emp (" + cleanCode + ")",
+          designation: "Staff",
+          dept: "Operations",
+          role: "Employee",
+          mob: "N/A",
+          location: "Primary Hub",
+          status: "Active"
+        };
+      }
+
+      let isLate = false;
+      let lateMinutes = 0;
+
+      if (action === "IN") {
+        const [shiftHour, shiftMinute] = config.shiftStartTime.split(":").map(Number);
+        const shiftStart = new Date(now);
+        shiftStart.setHours(shiftHour, shiftMinute, 0, 0);
+
+        const graceCutoff = new Date(shiftStart.getTime() + (config.graceMinutes * 60000));
+
+        if (now > graceCutoff) {
+          isLate = true;
+          const diffMs = now - shiftStart;
+          lateMinutes = Math.floor(diffMs / 60000);
+        }
+      }
+
+      let breakDurationMinutes = 0;
+      let previousOutScan = null;
+
+      if (action === "IN_BREAK") {
+        const previousOut = [...scanLogs].reverse().find(log => 
+          (log.hrmsCode === emp.hrmsCode || log.workforceCode === emp.workforceCode) && 
+          log.action === "OUT_BREAK"
+        );
+
+        if (previousOut) {
+          previousOutScan = previousOut;
+          const outTime = new Date(previousOut.timestamp);
+          const diffMs = now - outTime;
+          breakDurationMinutes = Math.max(1, Math.floor(diffMs / 60000));
+        }
+      }
+
+      const newLog = {
+        id: "LOG-" + Date.now(),
+        timestamp: now.toISOString(),
+        date: dateStr,
+        time: timeStr,
+        hrmsCode: emp.hrmsCode,
+        workforceCode: emp.workforceCode,
+        name: emp.name,
+        designation: emp.designation,
+        dept: emp.dept,
+        role: emp.role,
+        mob: emp.mob,
+        location: emp.location,
+        action: action,
+        isLate: isLate,
+        lateMinutes: lateMinutes,
+        breakDurationMinutes: breakDurationMinutes,
+        syncStatus: "Pending"
+      };
+
+      // Permanent Save: Logs are prepended and saved immediately
+      scanLogs.unshift(newLog);
+      localStorage.setItem("permanent_scan_logs", JSON.stringify(scanLogs));
+
+      displayLastScannedEmployee(emp, newLog, previousOutScan);
+      renderLogsTable();
+      updateStatCards();
+
+      sendToGoogleSheetWebhook(newLog);
+      playScanBeep(isLate ? "warning" : "success");
+    }
+
+    /* ============================================================
+       6. UI FEEDBACK & CARDS
+    ============================================================ */
+    function displayLastScannedEmployee(emp, log, previousOut) {
+      document.getElementById("empty-scan-state").classList.add("hidden");
+      const detailsCard = document.getElementById("employee-card-details");
+      detailsCard.classList.remove("hidden");
+
+      const initials = (emp.name || "EM").split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
+      document.getElementById("emp-avatar").innerText = initials;
+      document.getElementById("emp-name").innerText = emp.name;
+      document.getElementById("emp-role-dept").innerText = `${emp.designation} • ${emp.dept}`;
+      document.getElementById("emp-code").innerText = `${emp.hrmsCode} / ${emp.workforceCode}`;
+      document.getElementById("emp-location").innerText = emp.location || "Office";
+      document.getElementById("emp-phone").innerText = emp.mob || "N/A";
+
+      const badge = document.getElementById("scan-feedback-badge");
+      const statusBox = document.getElementById("status-alert-box");
+      const statusHeadline = document.getElementById("status-headline");
+      const statusDesc = document.getElementById("status-description");
+      const statusIconWrap = document.getElementById("status-icon-wrap");
+      const breakBox = document.getElementById("break-alert-box");
+
+      let actionLabel = "PUNCH REGISTERED";
+      if (log.action === "IN") actionLabel = "SHIFT IN PUNCH";
+      if (log.action === "OUT_BREAK") actionLabel = "OUT FOR BREAK";
+      if (log.action === "IN_BREAK") actionLabel = "RETURN FROM BREAK";
+      if (log.action === "OUT_SHIFT") actionLabel = "SHIFT END / DAY OUT";
+
+      badge.innerText = actionLabel;
+
+      if (log.action === "IN") {
+        if (log.isLate) {
+          badge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+          statusBox.className = "p-3.5 rounded-xl border flex items-start gap-3 bg-rose-950/40 border-rose-800 text-rose-200";
+          statusIconWrap.className = "mt-0.5 p-1 rounded-lg bg-rose-500/20 text-rose-400";
+          statusHeadline.innerText = `LATE ENTRY DETECTED (${log.lateMinutes} Mins Late)`;
+          statusDesc.innerText = `Punched IN at ${log.time}. Standard shift was ${config.shiftStartTime} (+${config.graceMinutes}m grace). Late recorded.`;
+        } else {
+          badge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+          statusBox.className = "p-3.5 rounded-xl border flex items-start gap-3 bg-emerald-950/40 border-emerald-800 text-emerald-200";
+          statusIconWrap.className = "mt-0.5 p-1 rounded-lg bg-emerald-500/20 text-emerald-400";
+          statusHeadline.innerText = `ON-TIME ENTRY (PUNCH IN)`;
+          statusDesc.innerText = `Punched IN on time at ${log.time}. Marked Present.`;
+        }
+      } else if (log.action === "OUT_BREAK") {
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+        statusBox.className = "p-3.5 rounded-xl border flex items-start gap-3 bg-amber-950/40 border-amber-800 text-amber-200";
+        statusIconWrap.className = "mt-0.5 p-1 rounded-lg bg-amber-500/20 text-amber-400";
+        statusHeadline.innerText = `BREAK STARTED (OUT)`;
+        statusDesc.innerText = `Employee scanned OUT for break at ${log.time}. Timer started.`;
+      } else if (log.action === "IN_BREAK") {
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+        statusBox.className = "p-3.5 rounded-xl border flex items-start gap-3 bg-blue-950/40 border-blue-800 text-blue-200";
+        statusIconWrap.className = "mt-0.5 p-1 rounded-lg bg-blue-500/20 text-blue-400";
+        statusHeadline.innerText = `RETURNED FROM BREAK (IN)`;
+        statusDesc.innerText = `Employee resumed duty at ${log.time}. Total break calculated.`;
+      } else {
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30";
+        statusBox.className = "p-3.5 rounded-xl border flex items-start gap-3 bg-purple-950/40 border-purple-800 text-purple-200";
+        statusIconWrap.className = "mt-0.5 p-1 rounded-lg bg-purple-500/20 text-purple-400";
+        statusHeadline.innerText = `DAY COMPLETED (SHIFT OUT)`;
+        statusDesc.innerText = `Punch recorded at ${log.time}. Final attendance logged.`;
+      }
+
+      if (log.action === "IN_BREAK" && log.breakDurationMinutes > 0) {
+        breakBox.classList.remove("hidden");
+        document.getElementById("break-calculation-text").innerHTML = 
+          `Out at <b class="text-white">${previousOut ? previousOut.time : '--'}</b>, returned at <b class="text-white">${log.time}</b>. Total Out Duration: <b class="text-amber-300 text-sm font-mono underline">${log.breakDurationMinutes} Minutes</b>.`;
+      } else {
+        breakBox.classList.add("hidden");
+      }
+
+      lucide.createIcons();
+    }
+
+    /* ============================================================
+       7. LOGS TABLE RENDERING & FILTERING
+    ============================================================ */
+    function renderLogsTable() {
+      const tbody = document.getElementById("logs-table-body");
+      const searchVal = document.getElementById("table-search")?.value.toLowerCase() || "";
+      const actionFilter = document.getElementById("table-filter-action")?.value || "ALL";
+      const statusFilter = document.getElementById("table-filter-status")?.value || "ALL";
+
+      tbody.innerHTML = "";
+
+      const filtered = scanLogs.filter(log => {
+        const matchesSearch = 
+          log.name.toLowerCase().includes(searchVal) || 
+          log.hrmsCode.toLowerCase().includes(searchVal) || 
+          log.workforceCode.toLowerCase().includes(searchVal) ||
+          log.dept.toLowerCase().includes(searchVal);
+
+        const matchesAction = actionFilter === "ALL" || log.action === actionFilter;
+
+        let matchesStatus = true;
+        if (statusFilter === "ON_TIME") matchesStatus = log.action === "IN" && !log.isLate;
+        if (statusFilter === "LATE") matchesStatus = log.action === "IN" && log.isLate;
+
+        return matchesSearch && matchesAction && matchesStatus;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="py-8 text-center text-slate-500 text-xs">
+              No scan records found matching the filter criteria.
+            </td>
+          </tr>
+        `;
+        document.getElementById("table-count-label").innerText = `Showing 0 of ${scanLogs.length} entries`;
+        return;
+      }
+
+      filtered.forEach((log, index) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/40 transition";
+
+        let actionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-850 text-slate-300">SCAN</span>`;
+        if (log.action === "IN") actionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">IN (Shift)</span>`;
+        if (log.action === "OUT_BREAK") actionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">OUT (Break)</span>`;
+        if (log.action === "IN_BREAK") actionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">IN (Break Return)</span>`;
+        if (log.action === "OUT_SHIFT") actionBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">OUT (Shift End)</span>`;
+
+        let lateBadge = `<span class="text-slate-500">-</span>`;
+        if (log.action === "IN") {
+          if (log.isLate) {
+            lateBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+              <i data-lucide="alert-circle" class="w-3 h-3"></i> Late (${log.lateMinutes}m)
+            </span>`;
+          } else {
+            lateBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400">
+              <i data-lucide="check" class="w-3 h-3"></i> On Time
+            </span>`;
+          }
+        }
+
+        let breakText = `<span class="text-slate-500">-</span>`;
+        if (log.action === "IN_BREAK" && log.breakDurationMinutes > 0) {
+          breakText = `<span class="font-mono font-bold text-amber-400">${log.breakDurationMinutes} Mins</span>`;
+        }
+
+        let syncIcon = `<span class="text-emerald-400 font-mono text-[10px]" title="Synced with Google Sheet">● Synced</span>`;
+        if (log.syncStatus === "Pending") syncIcon = `<span class="text-amber-400 font-mono text-[10px]" title="Pending Sync or Local">○ Local</span>`;
+        if (log.syncStatus === "Failed") syncIcon = `<span class="text-rose-400 font-mono text-[10px]" title="Sync Failed">✕ Failed</span>`;
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-500 font-mono text-[11px]">${index + 1}</td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <span class="font-mono text-white font-medium">${log.time}</span>
+            <span class="block text-[10px] text-slate-500">${log.date}</span>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <span class="font-mono font-semibold text-blue-400">${log.hrmsCode}</span>
+            <span class="block text-[10px] text-slate-500 font-mono">${log.workforceCode}</span>
+          </td>
+          <td class="py-2.5 px-3 font-medium text-white">${log.name}</td>
+          <td class="py-2.5 px-3 text-slate-300">
+            <div>${log.dept}</div>
+            <div class="text-[10px] text-slate-500">${log.designation}</div>
+          </td>
+          <td class="py-2.5 px-3 whitespace-nowrap">${actionBadge}</td>
+          <td class="py-2.5 px-3 whitespace-nowrap">${lateBadge}</td>
+          <td class="py-2.5 px-3 whitespace-nowrap">${breakText}</td>
+          <td class="py-2.5 px-3 text-right whitespace-nowrap">${syncIcon}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("table-count-label").innerText = `Showing ${filtered.length} of ${scanLogs.length} entries`;
+      lucide.createIcons();
+    }
+
+    function filterLogsTable() {
+      renderLogsTable();
+    }
+
+    async function clearAllLogs() {
+      if (confirm("Are you sure? This will delete all attendance logs from THIS COMPUTER and ALL OTHER COMPUTERS (Central Cloud).")) {
+        scanLogs = [];
+        localStorage.removeItem("permanent_scan_logs");
+        renderLogsTable();
+        updateStatCards();
+
+        // If webhook configured, send clear command to Central Google Sheet too
+        if (config.webhookUrl) {
+          try {
+            await fetch(config.webhookUrl, {
+              method: "POST",
+              mode: "no-cors",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "CLEAR_ALL_LOGS" })
+            });
+          } catch(e) {
+            console.error(e);
+          }
+        }
+
+        showToast("Records Deleted", "All scan logs permanently removed from all systems.", "trash", "rose");
+      }
+    }
+
+    /* ============================================================
+       8. METRIC STAT CARDS
+    ============================================================ */
+    function updateStatCards() {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const todayLogs = scanLogs.filter(l => l.date === todayStr);
+
+      document.getElementById("stat-total-scans").innerText = todayLogs.length;
+
+      const uniqueEmps = new Set(todayLogs.map(l => l.hrmsCode));
+      document.getElementById("stat-unique-emp").innerText = uniqueEmps.size;
+
+      const onTimeCount = todayLogs.filter(l => l.action === "IN" && !l.isLate).length;
+      document.getElementById("stat-on-time").innerText = onTimeCount;
+
+      const lateCount = todayLogs.filter(l => l.action === "IN" && l.isLate).length;
+      document.getElementById("stat-late").innerText = lateCount;
+
+      const empLatestStatus = {};
+      todayLogs.forEach(l => {
+        empLatestStatus[l.hrmsCode] = l.action;
+      });
+      const currentlyOnBreak = Object.values(empLatestStatus).filter(act => act === "OUT_BREAK").length;
+      document.getElementById("stat-out-break").innerText = currentlyOnBreak;
+    }
+
+    /* ============================================================
+       9. GOOGLE SHEET WEBHOOK SYNC
+    ============================================================ */
+    async function sendToGoogleSheetWebhook(log) {
+      const webhook = config.webhookUrl;
+      const syncStatusText = document.getElementById("cloud-sync-text");
+      const syncDot = document.getElementById("cloud-sync-indicator");
+
+      if (!webhook || webhook.trim() === "") {
+        log.syncStatus = "Pending";
+        if (syncStatusText) syncStatusText.innerText = "Local Mode (No Apps Script URL configured)";
+        if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-amber-400";
+        renderLogsTable();
+        return;
+      }
+
+      if (syncStatusText) syncStatusText.innerText = "Pushing scan to cloud...";
+      if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-blue-400 animate-ping";
+
+      const jsonString = JSON.stringify(log);
+
+      try {
+        // Attempt 1: Direct POST with text/plain (avoids CORS preflight)
+        await fetch(webhook, {
+          method: "POST",
+          mode: "no-cors",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8"
+          },
+          body: jsonString
+        });
+
+        // Attempt 2: Bulletproof Fallback via Image/GET beacon to guarantee Apps Script receipt across all network firewalls
+        try {
+          const fallbackBeacon = new Image();
+          fallbackBeacon.src = webhook + (webhook.includes("?") ? "&" : "?") + "payload=" + encodeURIComponent(jsonString) + "&_t=" + Date.now();
+        } catch(e) {}
+
+        log.syncStatus = "Synced";
+        if (syncStatusText) syncStatusText.innerText = "Uploaded to Central Sheet";
+        if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-emerald-500";
+
+        // Poll immediately so both devices update their view
+        setTimeout(() => fetchCloudLogs(false), 1500);
+
+      } catch (err) {
+        console.warn("Webhook sync error:", err);
+        log.syncStatus = "Pending";
+        if (syncStatusText) syncStatusText.innerText = "Sync Retrying...";
+        if (syncDot) syncDot.className = "w-2 h-2 rounded-full bg-amber-500";
+      }
+
+      renderLogsTable();
+    }
+
+    /* ============================================================
+       10. CAMERA QR/BARCODE SCANNER (OPTIONAL)
+    ============================================================ */
+    function toggleCameraScanner() {
+      const container = document.getElementById("camera-reader-container");
+      const btnText = document.getElementById("cam-btn-text");
+
+      if (isCameraActive) {
+        if (html5QrScanner) {
+          html5QrScanner.stop().then(() => {
+            html5QrScanner.clear();
+            container.classList.add("hidden");
+            btnText.innerText = "Open Device Camera";
+            isCameraActive = false;
+          }).catch(err => console.error(err));
+        }
+      } else {
+        container.classList.remove("hidden");
+        btnText.innerText = "Stop Camera";
+        isCameraActive = true;
+
+        html5QrScanner = new Html5Qrcode("camera-reader");
+        const configQr = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrScanner.start(
+          { facingMode: "environment" },
+          configQr,
+          (decodedText) => {
+            executeAttendanceLog(decodedText, getSelectedAction());
+            showToast("QR Scanned", `Code: ${decodedText}`, "qr-code", "blue");
+          },
+          (errorMessage) => {}
+        ).catch(err => {
+          showToast("Camera Error", "Unable to start camera. Please check browser permissions.", "camera-off", "rose");
+          container.classList.add("hidden");
+          btnText.innerText = "Open Device Camera";
+          isCameraActive = false;
+        });
+      }
+    }
+
+    /* ============================================================
+       11. EXPORT TO CSV / EXCEL REPORT
+    ============================================================ */
+    function exportLogsToCSV() {
+      if (scanLogs.length === 0) {
+        showToast("Export Failed", "No logs available to export.", "alert-triangle", "amber");
+        return;
+      }
+
+      const headers = [
+        "Date",
+        "Time",
+        "HRMS Code",
+        "Workforce Code",
+        "Employee Name",
+        "Department",
+        "Designation",
+        "Action",
+        "Late Status",
+        "Late Minutes",
+        "Break Duration Minutes",
+        "Sync Status"
+      ];
+
+      const csvRows = [headers.join(",")];
+
+      scanLogs.forEach(l => {
+        const row = [
+          `"${l.date}"`,
+          `"${l.time}"`,
+          `"${l.hrmsCode}"`,
+          `"${l.workforceCode}"`,
+          `"${l.name.replace(/"/g, '""')}"`,
+          `"${l.dept}"`,
+          `"${l.designation}"`,
+          `"${l.action}"`,
+          `"${l.isLate ? 'LATE' : 'ON_TIME'}"`,
+          l.lateMinutes,
+          l.breakDurationMinutes,
+          `"${l.syncStatus}"`
+        ];
+        csvRows.push(row.join(","));
+      });
+
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Attendance_Logs_${new Date().toISOString().split("T")[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast("Report Exported", "Attendance CSV downloaded successfully.", "file-spreadsheet", "emerald");
+    }
+
+    /* ============================================================
+       12. AUDIO FEEDBACK (SYNTHESIZED BEEP)
+    ============================================================ */
+    function playScanBeep(type = "success") {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === "success") {
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.12);
+        } else {
+          osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.25);
+        }
+      } catch (e) {}
+    }
+
+    /* ============================================================
+       13. MODALS & SETTINGS CONTROLLERS
+    ============================================================ */
+    function toggleSettingsModal(show) {
+      const modal = document.getElementById("settings-modal");
+      if (show) modal.classList.remove("hidden");
+      else modal.classList.add("hidden");
+      lucide.createIcons();
+    }
+
+    function toggleShareModal(show) {
+      const modal = document.getElementById("share-modal");
+      if (show) {
+        modal.classList.remove("hidden");
+        const urlInput = document.getElementById("share-url-input");
+        if (urlInput) {
+          // If webhook configured, use that, otherwise use current window location
+          urlInput.value = config.webhookUrl || window.location.href;
+        }
+      } else {
+        modal.classList.add("hidden");
+      }
+      lucide.createIcons();
+    }
+
+    function shareViaWhatsApp() {
+      const url = document.getElementById("share-url-input")?.value || window.location.href;
+      const text = encodeURIComponent("Smart Employee Attendance & Barcode Scanner App: " + url);
+      window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+    }
+
+    function openLinkDirect() {
+      const url = document.getElementById("share-url-input")?.value || window.location.href;
+      window.open(url, "_blank");
+    }
+
+    function copyShareLink() {
+      const input = document.getElementById("share-url-input");
+      if (input) {
+        input.select();
+        document.execCommand("copy");
+      }
+      const btn = document.getElementById("btn-copy-share");
+      if (btn) {
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!`;
+        btn.className = "px-3.5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0";
+        lucide.createIcons();
+        setTimeout(() => {
+          btn.innerHTML = `<i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy`;
+          btn.className = "px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shrink-0";
+          lucide.createIcons();
+        }, 2000);
+      }
+      showToast("Link Copied", "URL copied! Ab aap WhatsApp ya mail par kisi ko bhi bhej sakte hain.", "clipboard-check", "blue");
+    }
+
+    function toggleScriptModal(show) {
+      const modal = document.getElementById("script-modal");
+      if (show) modal.classList.remove("hidden");
+      else modal.classList.add("hidden");
+      lucide.createIcons();
+    }
+
+    function saveSettings() {
+      const shiftTime = document.getElementById("setting-shift-time")?.value;
+      const graceMins = parseInt(document.getElementById("setting-grace-mins")?.value, 10);
+      const webhook = document.getElementById("setting-webhook-url")?.value?.trim() || "";
+
+      config.shiftStartTime = shiftTime || "09:30";
+      config.graceMinutes = isNaN(graceMins) ? 15 : graceMins;
+      config.webhookUrl = webhook;
+
+      localStorage.setItem("att_config", JSON.stringify(config));
+      localStorage.setItem("att_webhook_url", webhook);
+
+      refreshRuleLabels();
+      toggleSettingsModal(false);
+
+      if (webhook) {
+        fetchCloudLogs(true);
+        if (cloudSyncInterval) clearInterval(cloudSyncInterval);
+        cloudSyncInterval = setInterval(fetchCloudLogs, 8000);
+      }
+
+      showToast("Settings Updated", "Shift timings and Webhook configuration saved.", "sliders", "emerald");
+    }
+
+    function copyAppsScriptCode() {
+      const codeText = document.getElementById("apps-script-code").innerText;
+      
+      const dummy = document.createElement("textarea");
+      dummy.value = codeText;
+      document.body.appendChild(dummy);
+      dummy.select();
+      document.execCommand("copy");
+      document.body.removeChild(dummy);
+
+      const copyBtn = document.getElementById("copy-btn");
+      copyBtn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Copied!`;
+      copyBtn.className = "px-2.5 py-1 bg-emerald-600 text-white rounded text-[11px] font-medium flex items-center gap-1";
+      lucide.createIcons();
+
+      setTimeout(() => {
+        copyBtn.innerHTML = `<i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy Code`;
+        copyBtn.className = "px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-medium flex items-center gap-1";
+        lucide.createIcons();
+      }, 2500);
+
+      showToast("Code Copied", "Paste it into Google Sheet Extensions > Apps Script.", "clipboard-check", "blue");
+    }
+
+    /* ============================================================
+       14. BULK EXCEL / SHEET IMPORT LOGIC
+    ============================================================ */
+    function toggleBulkModal(show) {
+      const modal = document.getElementById("bulk-modal");
+      if (show) {
+        modal.classList.remove("hidden");
+        updateSavedEmployeeCount();
+        previewBulkCount();
+      } else {
+        modal.classList.add("hidden");
+        focusScannerInput();
+      }
+      lucide.createIcons();
+    }
+
+    function parseBulkInputText(text) {
+      if (!text || !text.trim()) return [];
+      const lines = text.trim().split(/\r?\n/);
+      const parsed = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Auto-detect delimiter: tab (\t), comma (,), semicolon (;), or pipe (|)
+        let parts = [];
+        if (line.includes("\t")) {
+          parts = line.split("\t");
+        } else if (line.includes(";")) {
+          parts = line.split(";");
+        } else if (line.includes("|")) {
+          parts = line.split("|");
+        } else {
+          parts = line.split(",");
+        }
+
+        parts = parts.map(p => p.trim().replace(/^["']|["']$/g, ""));
+
+        const idCode = parts[0] || "";
+        // Skip header lines
+        if (idCode.toLowerCase().includes("hrms") || idCode.toLowerCase().includes("emp id") || idCode.toLowerCase().includes("code")) {
+          continue;
+        }
+
+        if (idCode) {
+          parsed.push({
+            hrmsCode: idCode.toUpperCase(),
+            workforceCode: parts[1] && parts[1].length < 15 && parts[1].toUpperCase().startsWith("WF") ? parts[1].toUpperCase() : idCode.toUpperCase(),
+            name: parts[1] && !parts[1].toUpperCase().startsWith("WF") ? parts[1] : (parts[2] || "Emp " + idCode),
+            designation: parts[2] && parts[2] !== parts[1] ? parts[2] : (parts[3] || "Staff"),
+            dept: parts[3] && parts[3] !== parts[2] ? parts[3] : (parts[4] || "Operations"),
+            role: "Employee",
+            mob: parts[4] && /^\d+$/.test(parts[4]) ? parts[4] : (parts[5] || "N/A"),
+            location: parts[5] || "Head Office",
+            status: "Active"
+          });
+        }
+      }
+      return parsed;
+    }
+
+    function previewBulkCount() {
+      const text = document.getElementById("bulk-paste-input").value;
+      const parsed = parseBulkInputText(text);
+      document.getElementById("detected-emp-count").innerText = parsed.length;
+    }
+
+    function handleBulkFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("bulk-paste-input").value = e.target.result;
+        previewBulkCount();
+      };
+      reader.readAsText(file);
+    }
+
+    function saveBulkEmployees() {
+      const text = document.getElementById("bulk-paste-input").value;
+      const newEmployees = parseBulkInputText(text);
+
+      if (newEmployees.length === 0) {
+        showToast("No Rows Found", "Please paste valid rows from Excel or Google Sheet.", "alert-circle", "amber");
+        return;
+      }
+
+      // Merge avoiding duplicate hrmsCodes
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      newEmployees.forEach(newEmp => {
+        const existingIdx = EMPLOYEE_DB.findIndex(e => e.hrmsCode.toUpperCase() === newEmp.hrmsCode.toUpperCase());
+        if (existingIdx >= 0) {
+          EMPLOYEE_DB[existingIdx] = { ...EMPLOYEE_DB[existingIdx], ...newEmp };
+          updatedCount++;
+        } else {
+          EMPLOYEE_DB.push(newEmp);
+          addedCount++;
+        }
+      });
+
+      // Permanent Save in LocalStorage
+      localStorage.setItem("permanent_employee_db", JSON.stringify(EMPLOYEE_DB));
+      updateSavedEmployeeCount();
+
+      document.getElementById("bulk-paste-input").value = "";
+      document.getElementById("detected-emp-count").innerText = "0";
+
+      toggleBulkModal(false);
+      showToast("Employees Saved", `${addedCount} added, ${updatedCount} updated. Permanently saved!`, "database", "emerald");
+    }
+
+    function clearCustomEmployees() {
+      if (confirm("Reset employee database to default initial records?")) {
+        EMPLOYEE_DB = [...DEFAULT_EMPLOYEES];
+        localStorage.setItem("permanent_employee_db", JSON.stringify(EMPLOYEE_DB));
+        updateSavedEmployeeCount();
+        document.getElementById("bulk-paste-input").value = "";
+        document.getElementById("detected-emp-count").innerText = "0";
+        showToast("Database Reset", "Restored to default test employees.", "refresh-cw", "blue");
+      }
+    }
+
+    function showToast(title, msg, icon = "info", color = "blue") {
+      const toast = document.getElementById("toast");
+      const tTitle = document.getElementById("toast-title");
+      const tMsg = document.getElementById("toast-msg");
+      const tIcon = document.getElementById("toast-icon");
+
+      tTitle.innerText = title;
+      tMsg.innerText = msg;
+      tIcon.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 text-${color}-400"></i>`;
+      lucide.createIcons();
+
+      toast.classList.remove("translate-y-20", "opacity-0");
+      toast.classList.add("translate-y-0", "opacity-100");
+
+      setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+        toast.classList.remove("translate-y-0", "opacity-100");
+      }, 3500);
+    }
+  </script>
+</body>
+</html>
