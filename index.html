@@ -1,17 +1,405 @@
-// Configured Web App Webhook URL
-const GOOGLE_SCRIPT_URL = "YOUR_NEW_DEPLOYED_WEB_APP_URL_HERE";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Employee In/Out & Late Tracker - Multi-Device Live Sync</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #050b14; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
 
-// Auto-fetch real-time logs from sheet every 5 seconds for Multi-Device Syncing
-async function syncLogsFromSheet() {
-  if(!GOOGLE_SCRIPT_URL) return;
-  try {
-    let res = await fetch(GOOGLE_SCRIPT_URL + "?action=getLogs");
-    let json = await res.json();
-    if(json.status === "success" && json.data) {
-       renderLogsTable(json.data);
-    }
-  } catch(e) {
-    console.error("Auto-sync error", e);
-  }
-}
-setInterval(syncLogsFromSheet, 5000);
+    <!-- Top Header -->
+    <header class="flex flex-col md:flex-row justify-between items-center bg-[#0b132b] border border-slate-800 p-4 rounded-xl mb-6 shadow-xl">
+        <div class="flex items-center space-x-3 mb-3 md:mb-0">
+            <div class="bg-blue-600 p-2.5 rounded-lg text-white">
+                <i class="fa-solid fa-fingerprint text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-wide text-white">Smart Employee In/Out & Late Tracker</h1>
+                <p class="text-xs text-emerald-400 font-medium">
+                    <i class="fa-solid fa-circle text-[8px] animate-pulse mr-1"></i> Multi-Device Live Sync Active • Sheet: EMP Details & Logs
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div id="live-clock" class="text-lg font-mono font-semibold text-cyan-400 bg-slate-900/80 px-4 py-1.5 rounded-lg border border-slate-700">
+                04:26:00 PM <span class="text-xs text-slate-400 block font-normal">Fri, Nov 6, 2026</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-[#0b132b] border border-slate-800 p-4 rounded-xl relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Scans Today</p>
+                    <h3 id="stat-total" class="text-3xl font-bold text-white mt-1">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-1"><i class="fa-solid fa-users text-blue-400 mr-1"></i> Unique Employees</p>
+                </div>
+                <div class="bg-blue-500/10 p-3 rounded-lg text-blue-400"><i class="fa-solid fa-bolt"></i></div>
+            </div>
+        </div>
+        <div class="bg-[#0b132b] border border-slate-800 p-4 rounded-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">On Time (IN)</p>
+                    <h3 id="stat-ontime" class="text-3xl font-bold text-emerald-400 mt-1">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Before Shift + Grace Cutoff</p>
+                </div>
+                <div class="bg-emerald-500/10 p-3 rounded-lg text-emerald-400"><i class="fa-solid fa-circle-check"></i></div>
+            </div>
+        </div>
+        <div class="bg-[#0b132b] border border-slate-800 p-4 rounded-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Late Marked (IN)</p>
+                    <h3 id="stat-late" class="text-3xl font-bold text-rose-400 mt-1">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Exceeded Shift Start Window</p>
+                </div>
+                <div class="bg-rose-500/10 p-3 rounded-lg text-rose-400"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            </div>
+        </div>
+        <div class="bg-[#0b132b] border border-slate-800 p-4 rounded-xl">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Currently Out / Break</p>
+                    <h3 id="stat-break" class="text-3xl font-bold text-amber-400 mt-1">0</h3>
+                    <p class="text-[11px] text-slate-400 mt-1">Break Time Tracking Active</p>
+                </div>
+                <div class="bg-amber-500/10 p-3 rounded-lg text-amber-400"><i class="fa-solid fa-mug-hot"></i></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Scanner & Result Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+        <!-- Scanner Input Box -->
+        <div class="lg:col-span-7 bg-[#0b132b] border border-slate-800 p-5 rounded-xl flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold tracking-wide text-slate-300 uppercase flex items-center">
+                        <i class="fa-solid fa-barcode text-blue-500 mr-2 text-lg"></i> Barcode / QR Code Gun Scanner
+                    </h2>
+                    <span class="text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">Ready to scan</span>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">Focus text box below. Scan gun automatically presses Enter after scan.</p>
+                
+                <!-- Action Selectors -->
+                <div class="mb-4">
+                    <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Select Scan Action:</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <button onclick="setScanAction('IN (Shift)')" id="btn-in" class="action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-500 bg-emerald-500/20 text-emerald-300 transition"><i class="fa-solid fa-arrow-right-to-bracket mr-1"></i> IN (Shift)</button>
+                        <button onclick="setScanAction('OUT (Break)')" id="btn-outbreak" class="action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 transition"><i class="fa-solid fa-mug-saucer mr-1"></i> OUT (Break)</button>
+                        <button onclick="setScanAction('IN (Return)')" id="btn-inreturn" class="action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 transition"><i class="fa-solid fa-arrow-rotate-left mr-1"></i> IN (Return)</button>
+                        <button onclick="setScanAction('OUT (Day End)')" id="btn-outend" class="action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 transition"><i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> OUT (Day End)</button>
+                    </div>
+                </div>
+
+                <!-- Input Field -->
+                <div class="relative">
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Employee ID / HRMS / Workforce Code Scanner Input</label>
+                    <div class="flex">
+                        <input type="text" id="scanner-input" autofocus placeholder="Scan Barcode here or type ID (e.g. EMP1040583, HR001)..." 
+                            class="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 text-white px-4 py-3 rounded-lg text-sm outline-none font-mono">
+                        <button onclick="processScan()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 rounded-r-lg font-medium text-sm transition">Enter</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shift Info Footer -->
+            <div class="mt-6 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-xs text-slate-400">
+                <span><i class="fa-regular fa-clock text-blue-400 mr-1"></i> Shift Target: <strong class="text-white">09:30 AM</strong></span>
+                <span>Grace: <strong class="text-white">15 Mins</strong></span>
+                <span>Late starts after: <strong class="text-rose-400">09:45 AM</strong></span>
+            </div>
+        </div>
+
+        <!-- Instant Scan Feedback Card -->
+        <div class="lg:col-span-5 bg-[#0b132b] border border-slate-800 p-5 rounded-xl flex flex-col justify-between">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Instant Scan Result</h3>
+                <span id="sync-badge" class="text-[11px] bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded border border-slate-700">Awaiting Scan</span>
+            </div>
+
+            <div id="scan-result-card" class="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center my-auto min-h-[160px]">
+                <div class="text-slate-500 text-3xl mb-2"><i class="fa-solid fa-qrcode"></i></div>
+                <p class="text-sm font-semibold text-slate-300">Koi bhi Employee Barcode scan karein</p>
+                <p class="text-xs text-slate-500 mt-1">Employee details, photo avatar, late calculation aur break timing yahan real-time me display hogi.</p>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
+                <span id="cloud-status-text"><i class="fa-solid fa-circle text-[8px] text-emerald-400 mr-1"></i> Google Sheet Live Sync Active</span>
+                <span class="text-blue-400 font-medium">EMP Details Connected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Log History Table -->
+    <div class="bg-[#0b132b] border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <div class="p-4 border-b border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div>
+                <h3 class="text-sm font-bold text-white flex items-center">
+                    <i class="fa-solid fa-list-check text-blue-500 mr-2"></i> Real-Time Attendance Log History
+                </h3>
+                <p class="text-xs text-slate-400">Live feed of all scans with timing, late markings & break duration calculations.</p>
+            </div>
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+                <div class="relative w-full sm:w-64">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500"><i class="fa-solid fa-magnifying-glass text-xs"></i></span>
+                    <input type="text" id="table-search" onkeyup="filterLogsTable()" placeholder="Search Name or Code..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white outline-none focus:border-blue-500">
+                </div>
+                <button onclick="clearLogsTable()" class="text-xs text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded bg-rose-500/10 border border-rose-500/20 font-medium transition">Clear Table</button>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4 font-semibold">#</th>
+                        <th class="py-3 px-4 font-semibold">Scan Time & Date</th>
+                        <th class="py-3 px-4 font-semibold">EMP ID / HRMS</th>
+                        <th class="py-3 px-4 font-semibold">Employee Name</th>
+                        <th class="py-3 px-4 font-semibold">Department & Role</th>
+                        <th class="py-3 px-4 font-semibold">Action</th>
+                        <th class="py-3 px-4 font-semibold">Late Calculation</th>
+                        <th class="py-3 px-4 font-semibold">Break Duration</th>
+                        <th class="py-3 px-4 font-semibold">Sheet Sync</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body" class="divide-y divide-slate-800/60">
+                    <!-- Dynamic Rows populated via JS -->
+                </tbody>
+            </table>
+        </div>
+        <div class="p-3 bg-slate-900/40 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
+            <span id="table-count-label">Showing 0 entries</span>
+            <span>Auto-saved locally and synchronized with Google Apps Script Webhook</span>
+        </div>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        // HARDCODED GOOGLE APPS SCRIPT WEB APP URL (Replace with your latest deployed URL)
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYSR4MJvpny4TSameuz2DQx1Bnsl8h9vw1347wmSrsXcqpJmSOGHXia2h_BHV.../exec";
+
+        let currentAction = "IN (Shift)";
+        let employeeMasterList = [];
+        let attendanceLogs = [];
+
+        // Live Clock
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('live-clock').innerHTML = now.toLocaleTimeString() + 
+                `<span class="text-xs text-slate-400 block font-normal">${now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>`;
+        }, 1000);
+
+        function setScanAction(action) {
+            currentAction = action;
+            document.querySelectorAll('.action-btn').forEach(btn => {
+                btn.className = "action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 transition";
+            });
+            let activeBtnId = 'btn-in';
+            if(action === 'OUT (Break)') activeBtnId = 'btn-outbreak';
+            if(action === 'IN (Return)') activeBtnId = 'btn-inreturn';
+            if(action === 'OUT (Day End)') activeBtnId = 'btn-outend';
+            
+            const btn = document.getElementById(activeBtnId);
+            btn.className = "action-btn px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-500 bg-emerald-500/20 text-emerald-300 transition";
+            document.getElementById('scanner-input').focus();
+        }
+
+        // Fetch Employee Master Data from Google Sheet on load
+        async function loadEmployees() {
+            try {
+                let res = await fetch(GOOGLE_SCRIPT_URL + "?action=getEmployees");
+                let json = await res.json();
+                if(json.status === "success" && json.data) {
+                    employeeMasterList = json.data;
+                }
+            } catch(e) {
+                console.log("Using cached or offline employee directory.");
+            }
+        }
+
+        // Fetch Live Attendance Logs for Multi-Device Syncing every 5 seconds
+        async function syncLogsFromSheet() {
+            try {
+                let res = await fetch(GOOGLE_SCRIPT_URL + "?action=getLogs");
+                let json = await res.json();
+                if(json.status === "success" && json.data) {
+                    attendanceLogs = json.data;
+                    renderLogsTable(attendanceLogs);
+                    updateKPIs();
+                }
+            } catch(e) {
+                // fallback to local logs if offline
+            }
+        }
+
+        document.getElementById('scanner-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                processScan();
+            }
+        });
+
+        async function processScan() {
+            const inputField = document.getElementById('scanner-input');
+            const query = inputField.value.trim();
+            if(!query) return;
+
+            inputField.value = "";
+
+            // Find Employee from Master list (Matches HRMS Code or Workforce Code)
+            let emp = employeeMasterList.find(e => e.id.toLowerCase() === query.toLowerCase() || e.workforceId.toLowerCase() === query.toLowerCase());
+            
+            if(!emp) {
+                // Fallback dummy object if not found in master yet
+                emp = {
+                    id: query,
+                    workforceId: query,
+                    name: "Emp (" + query + ")",
+                    dept: "Operations",
+                    role: "Staff"
+                };
+            }
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " " + now.toLocaleDateString();
+
+            // Late Calculation (Shift starts at 09:30 AM with 15 mins grace i.e. 09:45 AM)
+            let lateStatus = "On Time";
+            let lateClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+            
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const totalMins = hours * 60 + minutes;
+            const shiftCutoffMins = 9 * 60 + 45; // 09:45 AM
+
+            if(currentAction === 'IN (Shift)' && totalMins > shiftCutoffMins) {
+                let diff = totalMins - shiftCutoffMins;
+                lateStatus = `Late (${diff}m)`;
+                lateClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+            }
+
+            const logEntry = {
+                scanTime: timeString,
+                empId: emp.id || emp.workforceId,
+                empName: emp.name,
+                department: emp.dept + " / " + emp.role,
+                action: currentAction,
+                lateCalculation: lateStatus,
+                breakDuration: "-"
+            };
+
+            // Update UI Instant Card
+            document.getElementById('sync-badge').className = "text-[11px] bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded border border-emerald-500/30";
+            document.getElementById('sync-badge').innerText = "Scan Verified";
+            
+            document.getElementById('scan-result-card').innerHTML = `
+                <div class="flex items-center space-x-3 w-full text-left">
+                    <div class="bg-blue-600 text-white font-bold h-12 w-12 rounded-xl flex items-center justify-center text-lg shadow-lg">
+                        ${emp.name.charAt(0)}
+                    </div>
+                    <div class="overflow-hidden">
+                        <h4 class="text-sm font-bold text-white truncate">${emp.name}</h4>
+                        <p class="text-xs text-blue-400 font-mono">${emp.id} • ${emp.dept}</p>
+                        <span class="inline-block mt-1 text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-300 border border-slate-700">${currentAction}</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 w-full mt-4 text-left">
+                    <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block uppercase">Late Status</span>
+                        <span class="text-xs font-semibold ${lateStatus.includes('Late') ? 'text-rose-400' : 'text-emerald-400'}">${lateStatus}</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                        <span class="text-[10px] text-slate-400 block uppercase">Time Recorded</span>
+                        <span class="text-xs font-mono text-slate-200">${timeString.split(' ')[0]} ${timeString.split(' ')[1]}</span>
+                    </div>
+                </div>
+            `;
+
+            // Push locally
+            attendanceLogs.unshift(logEntry);
+            renderLogsTable(attendanceLogs);
+            updateKPIs();
+
+            // Send to Google Sheet via Webhook POST
+            try {
+                await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logEntry)
+                });
+            } catch(e) {
+                console.log("Logged locally, sheet sync pending connection.");
+            }
+        }
+
+        function renderLogsTable(logs) {
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = "";
+            if(!logs || logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-500">No attendance records found.</td></tr>`;
+                document.getElementById('table-count-label').innerText = "Showing 0 entries";
+                return;
+            }
+
+            logs.forEach((log, index) => {
+                let badgeColor = log.lateCalculation && log.lateCalculation.includes('Late') ? 
+                    "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-slate-500">${logs.length - index}</td>
+                    <td class="py-3 px-4 font-mono text-slate-300">${log.scanTime}</td>
+                    <td class="py-3 px-4 font-mono text-blue-400 font-semibold">${log.empId}</td>
+                    <td class="py-3 px-4 font-semibold text-white">${log.empName}</td>
+                    <td class="py-3 px-4 text-slate-400">${log.department}</td>
+                    <td class="py-3 px-4"><span class="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded text-[10px] font-medium">${log.action}</span></td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-medium ${badgeColor}">${log.lateCalculation}</span></td>
+                    <td class="py-3 px-4 text-slate-400">${log.breakDuration || '-'}</td>
+                    <td class="py-3 px-4 text-emerald-400 font-medium"><i class="fa-solid fa-circle text-[6px] mr-1"></i> Synced</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('table-count-label').innerText = `Showing ${logs.length} entries`;
+        }
+
+        function updateKPIs() {
+            document.getElementById('stat-total').innerText = attendanceLogs.length;
+            let onTimeCount = attendanceLogs.filter(l => l.lateCalculation === 'On Time').length;
+            let lateCount = attendanceLogs.filter(l => l.lateCalculation && l.lateCalculation.includes('Late')).length;
+            document.getElementById('stat-ontime').innerText = onTimeCount;
+            document.getElementById('stat-late').innerText = lateCount;
+        }
+
+        function filterLogsTable() {
+            let query = document.getElementById('table-search').value.toLowerCase();
+            let filtered = attendanceLogs.filter(l => l.empId.toLowerCase().includes(query) || l.empName.toLowerCase().includes(query));
+            renderLogsTable(filtered);
+        }
+
+        function clearLogsTable() {
+            if(confirm("Are you sure you want to clear current session logs view?")) {
+                attendanceLogs = [];
+                renderLogsTable(attendanceLogs);
+                updateKPIs();
+            }
+        }
+
+        // Initialize on load
+        window.onload = function() {
+            loadEmployees();
+            setInterval(syncLogsFromSheet, 5000); // Poll every 5 seconds for multi-device sync
+        }
+    </script>
+</body>
+</html>
