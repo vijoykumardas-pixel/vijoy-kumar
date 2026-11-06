@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Employee In/Out & Late Tracker</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <!-- Inter Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            navy: {
+              950: '#070a14',
+              900: '#0b0f19',
+              850: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+            },
+            accent: {
+              emerald: '#10b981',
+              cyan: '#06b6d4',
+              blue: '#3b82f6',
+              amber: '#f59e0b',
+              rose: '#f43f5e',
+              purple: '#8b5cf6'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #070c18;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .glow-box-blue {
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+    }
+    .glow-box-emerald {
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+    }
+    .glow-box-rose {
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.15);
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.05); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-200 custom-scrollbar antialiased">
+
+  <!-- TOP APP HEADER -->
+  <header class="bg-navy-900 border-b border-slate-800/80 px-4 py-3 sticky top-0 z-30 shadow-md">
+    <div class="max-w-[1700px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-4">
+      
+      <!-- Brand & Status -->
+      <div class="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-start">
+        <div class="flex items-center gap-3">
+          <div class="bg-blue-600/20 text-blue-400 p-2.5 rounded-xl border border-blue-500/30">
+            <i class="fa-solid fa-qrcode text-xl"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="font-bold text-lg text-white tracking-wide">Smart Employee In/Out & Late Tracker</h1>
+              <span id="syncStatusBadge" class="text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                Multi-Device Live Sync
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+              <span>Sheet ID: <span id="displaySheetId" class="text-slate-300 font-mono">117_aY6...ewKXg</span></span>
+              <span>•</span>
+              <span>Sheet: <span class="text-slate-300 font-medium">EMP Details & Logs</span></span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Mobile clock toggle -->
+        <div class="text-right lg:hidden">
+          <div id="mobileClock" class="font-mono text-sm font-bold text-blue-400">00:00:00 PM</div>
+        </div>
+      </div>
+
+      <!-- Live Clock & Top Controls -->
+      <div class="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto">
+        <!-- Live Clock -->
+        <div class="hidden sm:flex flex-col items-end pr-3 border-r border-slate-800">
+          <div id="liveClock" class="font-mono font-bold text-lg text-white tracking-wider">00:00:00 PM</div>
+          <div id="liveDate" class="text-[11px] font-medium text-slate-400">Thu, Nov 5, 2026</div>
+        </div>
+
+        <!-- Action Buttons -->
+        <button id="btnManualSync" onclick="triggerManualSync()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-all flex items-center gap-2">
+          <i class="fa-solid fa-rotate text-blue-400"></i> Sync All Devices
+        </button>
+
+        <button onclick="toggleImportModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-all flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-emerald-400"></i> Import Employees
+        </button>
+
+        <button onclick="toggleConfigModal()" class="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg border border-blue-500/40 transition-all flex items-center gap-2">
+          <i class="fa-solid fa-link"></i> Sheet Config
+        </button>
+
+        <button onclick="toggleShiftModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition-all flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-amber-400"></i> Shift & Config
+        </button>
+
+        <button onclick="toggleScriptModal()" class="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 text-xs font-semibold rounded-lg border border-purple-500/40 transition-all flex items-center gap-2">
+          <i class="fa-solid fa-code"></i> Apps Script Code
+        </button>
+
+        <button onclick="exportLogsToCSV()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-all shadow-sm flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Export Logs
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-[1700px] w-full mx-auto p-4 sm:p-6 space-y-6 flex-grow">
+
+    <!-- KPI SUMMARY CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Card 1: Total Scans -->
+      <div class="bg-navy-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden group hover:border-slate-700 transition-all">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Scans Today</span>
+          <div class="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+            <i class="fa-solid fa-bolt text-xs"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div id="metricTotalScans" class="text-3xl font-extrabold text-white tracking-tight">0</div>
+          <div class="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-users text-slate-500"></i>
+            <span id="metricUniqueEmp">0</span> Unique Employees
+          </div>
+        </div>
+        <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-all"></div>
+      </div>
+
+      <!-- Card 2: On Time IN -->
+      <div class="bg-navy-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden group hover:border-slate-700 transition-all">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">On Time (IN)</span>
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i class="fa-solid fa-circle-check text-xs"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div id="metricOnTime" class="text-3xl font-extrabold text-emerald-400 tracking-tight">0</div>
+          <div class="text-xs text-slate-400 mt-1">Before Shift + Grace Cutoff</div>
+        </div>
+        <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all"></div>
+      </div>
+
+      <!-- Card 3: Late Marked -->
+      <div class="bg-navy-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden group hover:border-slate-700 transition-all">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-rose-400">Late Marked (IN)</span>
+          <div class="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center">
+            <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div id="metricLate" class="text-3xl font-extrabold text-rose-400 tracking-tight">0</div>
+          <div class="text-xs text-slate-400 mt-1">Exceeded Shift Start Window</div>
+        </div>
+        <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-rose-500/5 rounded-full blur-xl group-hover:bg-rose-500/10 transition-all"></div>
+      </div>
+
+      <!-- Card 4: Currently Out / Break -->
+      <div class="bg-navy-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between relative overflow-hidden group hover:border-slate-700 transition-all">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Currently OUT / Break</span>
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-mug-hot text-xs"></i>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div id="metricOnBreak" class="text-3xl font-extrabold text-amber-400 tracking-tight">0</div>
+          <div class="text-xs text-slate-400 mt-1">Break Time Tracking Active</div>
+        </div>
+        <div class="absolute -right-4 -bottom-4 w-20 h-20 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all"></div>
+      </div>
+
+    </div>
+
+    <!-- MAIN INTERACTION PANELS (SCANNER LEFT + REAL-TIME DISPLAY RIGHT) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- LEFT PANEL: Barcode / QR Gun Scanner Setup -->
+      <div class="lg:col-span-7 bg-navy-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-5 shadow-lg">
+        
+        <div>
+          <!-- Panel Title & Camera Simulation -->
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-barcode text-blue-400 text-lg"></i>
+              <h2 class="font-bold text-white tracking-wide">Barcode / QR Code Gun Scanner</h2>
+            </div>
+            <button onclick="simulateCameraScan()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs rounded-lg transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-camera"></i> Open Device Camera
+            </button>
+          </div>
+          <p class="text-xs text-slate-400 mt-2">Focus text box below. Scan gun automatically presses Enter after scan.</p>
+        </div>
+
+        <!-- SELECT SCAN ACTION BUTTONS -->
+        <div class="space-y-2">
+          <label class="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Select Scan Action:</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onclick="setAction('IN (Shift)')" id="btnActionIn" 
+              class="action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 bg-emerald-600 text-white border-emerald-500 shadow-md">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i> IN (Shift)
+            </button>
+
+            <button type="button" onclick="setAction('OUT (Break)')" id="btnActionOutBreak" 
+              class="action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700">
+              <i class="fa-solid fa-mug-hot"></i> OUT (Break)
+            </button>
+
+            <button type="button" onclick="setAction('IN (Return)')" id="btnActionInReturn" 
+              class="action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700">
+              <i class="fa-solid fa-rotate-left"></i> IN (Return)
+            </button>
+
+            <button type="button" onclick="setAction('OUT (Day End)')" id="btnActionOutEnd" 
+              class="action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i> OUT (Day End)
+            </button>
+          </div>
+        </div>
+
+        <!-- SCANNER INPUT FORM -->
+        <form onsubmit="handleScanSubmit(event)" class="space-y-3">
+          <div class="flex items-center justify-between text-xs">
+            <label for="scannerInput" class="font-medium text-slate-300">Employee ID / HRMS / Workforce Code Scanner Input</label>
+            <span class="text-[11px] text-emerald-400 flex items-center gap-1 font-mono">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Ready to scan
+            </span>
+          </div>
+
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+              <i class="fa-solid fa-expand text-lg"></i>
+            </div>
+            <input 
+              type="text" 
+              id="scannerInput" 
+              autocomplete="off"
+              placeholder="Scan Barcode here or type ID (e.g. EMP1040583, HR001)..." 
+              class="w-full bg-navy-950 border-2 border-blue-500/80 text-white placeholder-slate-500 rounded-xl pl-10 pr-24 py-3.5 text-sm font-mono focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all shadow-inner"
+            />
+            <button 
+              type="submit" 
+              class="absolute right-2 top-2 bottom-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow">
+              Enter <i class="fa-solid fa-turn-down rotate-90 text-[10px]"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-amber-400/90 flex items-center gap-1.5 italic">
+            <i class="fa-solid fa-lightbulb"></i>
+            Pro Tip: Gun scanner automatically scans and fires Enter. Keep cursor focused in this box for continuous non-stop scanning.
+          </p>
+        </form>
+
+        <!-- SHIFT TARGET FOOTER BAR -->
+        <div class="bg-navy-950 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <i class="fa-regular fa-clock text-slate-400"></i>
+            <span>Shift Target: <strong id="cfgDisplayShiftStart" class="text-white font-mono">09:30 AM</strong></span>
+          </div>
+          <div>
+            <span>Grace: <strong id="cfgDisplayGrace" class="text-white font-mono">15 Mins</strong></span>
+          </div>
+          <div class="text-rose-400">
+            <span>Late starts after: <strong id="cfgDisplayLateCutoff" class="font-mono">09:45 AM</strong></span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT PANEL: Instant Scan Result Display -->
+      <div class="lg:col-span-5 bg-navy-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between relative min-h-[340px] shadow-lg">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <i class="fa-regular fa-circle-check text-emerald-400"></i>
+            <h2 class="font-bold text-white tracking-wide text-sm">INSTANT SCAN RESULT</h2>
+          </div>
+          <span id="scanStateBadge" class="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-slate-800 text-slate-400 rounded-md border border-slate-700">
+            Awaiting Scan
+          </span>
+        </div>
+
+        <!-- Dynamic Dynamic Result Area -->
+        <div id="scanResultContainer" class="my-auto py-6 flex flex-col items-center justify-center text-center">
+          <!-- Default Idle State -->
+          <div id="scanIdleState" class="space-y-3">
+            <div class="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700 flex items-center justify-center mx-auto text-slate-500 text-2xl">
+              <i class="fa-solid fa-qrcode"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-slate-200">Koi bhi Employee Barcode scan karein</h3>
+              <p class="text-xs text-slate-400 max-w-xs mx-auto mt-1">
+                Employee details, photo avatar, late calculation aur break timing yahan real-time me display hogi.
+              </p>
+            </div>
+          </div>
+
+          <!-- Active Scanned Card (Hidden Initially) -->
+          <div id="scanActiveState" class="hidden w-full space-y-4">
+            <div class="flex items-center gap-4 text-left bg-navy-950 border border-slate-800 p-4 rounded-xl">
+              <div id="scannedAvatar" class="w-14 h-14 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-xl font-bold flex-shrink-0">
+                EP
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="flex items-center justify-between">
+                  <span id="scannedEmpId" class="font-mono text-xs font-bold text-blue-400">EMP1040583</span>
+                  <span id="scannedActionBadge" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">IN (Shift)</span>
+                </div>
+                <h4 id="scannedEmpName" class="text-base font-bold text-white truncate mt-0.5">Rahul Sharma</h4>
+                <p id="scannedEmpRole" class="text-xs text-slate-400">Operations • Senior Executive</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-left text-xs">
+              <div class="bg-navy-950 p-3 rounded-xl border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Late Status</span>
+                <div id="scannedLateDetail" class="font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
+                  <i class="fa-solid fa-check"></i> On Time
+                </div>
+              </div>
+              <div class="bg-navy-950 p-3 rounded-xl border border-slate-800">
+                <span class="text-slate-500 text-[10px] uppercase font-bold tracking-wider">Time Recorded</span>
+                <div id="scannedTimeDetail" class="font-bold text-white mt-1 font-mono">
+                  09:14:02 AM
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer Link Indicator -->
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2 text-slate-400">
+            <span id="cloudSyncDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span id="cloudSyncText">Checking Cloud Sync...</span>
+          </div>
+          <button onclick="toggleConfigModal()" class="text-blue-400 hover:underline text-xs flex items-center gap-1">
+            <i class="fa-solid fa-link text-[10px]"></i> Setup / Fix Cloud Link
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- BOTTOM PANEL: REAL-TIME ATTENDANCE LOG HISTORY -->
+    <div class="bg-navy-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
+      
+      <!-- Table Header & Controls -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2">
+        <div>
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-list-check text-blue-400"></i>
+            <h2 class="font-bold text-white text-base">Real-Time Attendance Log History</h2>
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">Live feed of all scans with timing, late markings & break duration calculations.</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Search -->
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+            <input 
+              type="text" 
+              id="filterSearch" 
+              oninput="renderLogsTable()" 
+              placeholder="Search Name or Code..." 
+              class="bg-navy-950 border border-slate-700 text-xs text-white placeholder-slate-500 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-blue-500 w-44"
+            />
+          </div>
+
+          <!-- Action Filter -->
+          <select id="filterAction" onchange="renderLogsTable()" class="bg-navy-950 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+            <option value="ALL">All Actions</option>
+            <option value="IN (Shift)">IN (Shift)</option>
+            <option value="OUT (Break)">OUT (Break)</option>
+            <option value="IN (Return)">IN (Return)</option>
+            <option value="OUT (Day End)">OUT (Day End)</option>
+          </select>
+
+          <!-- Status Filter -->
+          <select id="filterStatus" onchange="renderLogsTable()" class="bg-navy-950 border border-slate-700 text-xs text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+            <option value="ALL">All Statuses</option>
+            <option value="On Time">On Time</option>
+            <option value="Late">Late</option>
+          </select>
+
+          <!-- Clear Button -->
+          <button onclick="clearLogs()" class="px-3 py-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 text-xs font-semibold rounded-lg transition-all">
+            Clear Table
+          </button>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-navy-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px] tracking-wider">
+            <tr>
+              <th class="py-3 px-4">#</th>
+              <th class="py-3 px-4">Scan Time & Date</th>
+              <th class="py-3 px-4">Emp ID / HRMS</th>
+              <th class="py-3 px-4">Employee Name</th>
+              <th class="py-3 px-4">Department & Role</th>
+              <th class="py-3 px-4">Action</th>
+              <th class="py-3 px-4">Late Calculation</th>
+              <th class="py-3 px-4">Break Duration</th>
+              <th class="py-3 px-4 text-right">Sheet Sync</th>
+            </tr>
+          </thead>
+          <tbody id="attendanceLogsTbody" class="divide-y divide-slate-800/60 bg-navy-900 font-mono">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Footer pagination info -->
+      <div class="flex items-center justify-between text-xs text-slate-400 pt-2">
+        <div>Showing <span id="logCountDisplay" class="font-bold text-white">0</span> entries</div>
+        <div class="text-[11px] text-slate-500">Auto-saved locally and synchronized with Google Apps Script Webhook</div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- GOOGLE APPS SCRIPT CODE MODAL -->
+  <div id="scriptModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-navy-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-code text-purple-400 text-lg"></i>
+          <div>
+            <h3 class="font-bold text-white text-base">Google Apps Script Backend Code (`Code.gs`)</h3>
+            <p class="text-xs text-slate-400">Copy this code into your Google Sheet's Apps Script Editor to enable live database sync.</p>
+          </div>
+        </div>
+        <button onclick="toggleScriptModal()" class="text-slate-400 hover:text-white p-2">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-4 overflow-y-auto custom-scrollbar flex-grow space-y-4">
+        <div class="bg-purple-950/40 border border-purple-500/30 rounded-xl p-3 text-xs text-purple-200 space-y-1">
+          <p class="font-bold">Instructions to Deploy:</p>
+          <ol class="list-decimal pl-4 space-y-1 text-slate-300">
+            <li>Open your Google Sheet → Go to <strong>Extensions</strong> → <strong>Apps Script</strong>.</li>
+            <li>Paste the code below into <code>Code.gs</code> replacing existing text.</li>
+            <li>Click <strong>Deploy</strong> → <strong>New deployment</strong> → Select type: <strong>Web App</strong>.</li>
+            <li>Set <em>Execute as</em>: <strong>Me</strong> and <em>Who has access</em>: <strong>Anyone</strong>.</li>
+            <li>Copy the Web App URL and paste it in the <strong>Sheet Config</strong> button of this app.</li>
+          </ol>
+        </div>
+
+        <div class="relative">
+          <button onclick="copyAppsScriptCode()" class="absolute right-3 top-3 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg shadow transition-all">
+            <i class="fa-regular fa-copy"></i> Copy Code
+          </button>
+          <pre id="appsScriptCodeBlock" class="bg-navy-950 border border-slate-800 p-4 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto leading-relaxed max-h-[400px]">
+// ==========================================
+// SMART EMPLOYEE TRACKER - GOOGLE APPS SCRIPT
+// ==========================================
+
+function doGet(e) {
+  var action = e.parameter.action;
+  var sheet = getOrCreateLogsSheet();
+  
+  if (action === "fetchLogs") {
+    var data = sheet.getDataRange().getValues();
+    var headers = data.shift();
+    var logs = data.map(function(row) {
+      return {
+        id: row[0],
+        timestamp: row[1],
+        empId: row[2],
+        empName: row[3],
+        dept: row[4],
+        action: row[5],
+        lateCalc: row[6],
+        breakDuration: row[7],
+        status: row[8]
+      };
+    });
+    return responseJSON({ status: "success", logs: logs });
+  }
+
+  return responseJSON({ status: "online", message: "Employee Tracker Webhook Active" });
+}
+
+function doPost(e) {
+  try {
+    var contents = JSON.parse(e.postData.contents);
+    var sheet = getOrCreateLogsSheet();
+    
+    sheet.appendRow([
+      contents.id || Date.now(),
+      contents.timestamp || new Date().toLocaleString(),
+      contents.empId || "",
+      contents.empName || "",
+      contents.dept || "",
+      contents.action || "",
+      contents.lateCalc || "-",
+      contents.breakDuration || "-",
+      "Synced"
+    ]);
+
+    return responseJSON({ status: "success", message: "Row added successfully" });
+  } catch (err) {
+    return responseJSON({ status: "error", message: err.toString() });
+  }
+}
+
+function getOrCreateLogsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("Attendance Logs");
+  if (!sheet) {
+    sheet = ss.insertSheet("Attendance Logs");
+    sheet.appendRow([
+      "ID", "Scan Time & Date", "EMP ID", "Employee Name", "Department & Role", "Action", "Late Calculation", "Break Duration", "Status"
+    ]);
+    sheet.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+  }
+  return sheet;
+}
+
+function responseJSON(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+          </pre>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 text-right">
+        <button onclick="toggleScriptModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-lg">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG / WEBHOOK SETUP MODAL -->
+  <div id="configModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-navy-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl space-y-4 p-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-link text-blue-400 text-lg"></i>
+          <h3 class="font-bold text-white text-base">Google Sheets Webhook Setup</h3>
+        </div>
+        <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Google Apps Script Web App Endpoint URL</label>
+          <input 
+            type="text" 
+            id="webhookUrlInput" 
+            placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+            class="w-full bg-navy-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+          />
+          <p class="text-[11px] text-slate-400 mt-1">Paste your deployed Web App URL here to stream attendance data directly into your sheet.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Sheet Identifier (Optional Display)</label>
+          <input 
+            type="text" 
+            id="sheetIdInput" 
+            placeholder="117_aY6...ewKXg"
+            class="w-full bg-navy-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div class="bg-blue-950/30 border border-blue-500/20 rounded-xl p-3 text-slate-300">
+          <p class="font-bold text-blue-400">Multi-Device Live Sync Behavior:</p>
+          <p class="mt-0.5">When Webhook URL is saved, this dashboard automatically polls your Google Sheet every 10 seconds. Scans performed on any computer or gun scanner will reflect universally.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
+        <button onclick="toggleConfigModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-700">Cancel</button>
+        <button onclick="saveWebhookConfig()" class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-500">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT & CONFIGURATION MODAL -->
+  <div id="shiftModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-navy-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl space-y-4 p-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-amber-400 text-lg"></i>
+          <h3 class="font-bold text-white text-base">Shift Target & Grace Rules</h3>
+        </div>
+        <button onclick="toggleShiftModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Shift Start Time (HH:MM)</label>
+          <input 
+            type="time" 
+            id="shiftTimeInput" 
+            value="09:30"
+            class="w-full bg-navy-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+          />
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Grace Period (Minutes)</label>
+          <input 
+            type="number" 
+            id="graceMinsInput" 
+            value="15"
+            min="0"
+            max="120"
+            class="w-full bg-navy-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+          />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
+        <button onclick="toggleShiftModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-700">Cancel</button>
+        <button onclick="saveShiftConfig()" class="px-4 py-2 bg-amber-600 text-white text-xs font-semibold rounded-lg hover:bg-amber-500">Update Rules</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BULK IMPORT EMPLOYEES MODAL -->
+  <div id="importModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-navy-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl space-y-4 p-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-file-excel text-emerald-400 text-lg"></i>
+          <h3 class="font-bold text-white text-base">Bulk Employee Roster Import</h3>
+        </div>
+        <button onclick="toggleImportModal()" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-400">Paste JSON array or CSV format of employees (ID, Name, Dept, Role):</p>
+        <textarea 
+          id="importDataInput" 
+          rows="6"
+          placeholder='[
+  {"id":"EMP1040583", "name":"Rahul Sharma", "dept":"Operations", "role":"Staff"},
+  {"id":"EMP0981818", "name":"Priya Singh", "dept":"HR & Admin", "role":"Manager"}
+]'
+          class="w-full bg-navy-950 border border-slate-700 rounded-xl p-3 font-mono text-xs text-white focus:outline-none focus:border-emerald-500"
+        ></textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-slate-800 pt-3">
+        <button onclick="toggleImportModal()" class="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-700">Cancel</button>
+        <button onclick="saveEmployeeImport()" class="px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-500">Import Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP FOOTER -->
+  <footer class="bg-navy-900 border-t border-slate-800/80 px-4 py-3 text-center text-xs text-slate-500">
+    Smart Employee Attendance & Late Tracking System • Powered by Google Apps Script & Live Webhooks
+  </footer>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    // --- STATE MANAGEMENT ---
+    let selectedAction = 'IN (Shift)';
+    let shiftStartTime = '09:30';
+    let graceMinutes = 15;
+    let webhookUrl = '';
+    let sheetId = '117_aY6...ewKXg';
+    
+    // Sample Employee Directory
+    let employeeDb = {
+      'EMP1040583': { name: 'Rahul Sharma', dept: 'Operations', role: 'Staff' },
+      'EMP0981818': { name: 'Priya Singh', dept: 'Operations', role: 'Staff' },
+      'HR001': { name: 'Amit Kumar', dept: 'Human Resources', role: 'HR Lead' },
+      'WF-104': { name: 'Neha Gupta', dept: 'Engineering', role: 'Senior Developer' }
+    };
+
+    // Attendance History Logs
+    let attendanceLogs = [];
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+      loadSavedConfig();
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      // Auto focus scanner input box
+      focusScannerInput();
+      document.addEventListener('click', (e) => {
+        // Keeps input focused unless user is interacting with form controls or modals
+        if (!e.target.closest('input, button, select, textarea, .modal')) {
+          focusScannerInput();
+        }
+      });
+
+      // Load initial mock logs if none exists
+      if (attendanceLogs.length === 0) {
+        initSampleLogs();
+      } else {
+        renderLogsTable();
+        updateMetrics();
+      }
+
+      // Check cloud sync link status
+      checkCloudSyncStatus();
+
+      // Setup periodic polling for multi-device sync
+      setInterval(syncFromCloud, 10000);
+    };
+
+    function focusScannerInput() {
+      const input = document.getElementById('scannerInput');
+      if (input) input.focus();
+    }
+
+    // --- CLOCK & TIMERS ---
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      
+      document.getElementById('liveClock').textContent = timeStr;
+      document.getElementById('liveDate').textContent = dateStr;
+      const mob = document.getElementById('mobileClock');
+      if (mob) mob.textContent = timeStr;
+    }
+
+    // --- ACTION SELECTION ---
+    function setAction(actionName) {
+      selectedAction = actionName;
+      const btnIn = document.getElementById('btnActionIn');
+      const btnOutBreak = document.getElementById('btnActionOutBreak');
+      const btnInReturn = document.getElementById('btnActionInReturn');
+      const btnOutEnd = document.getElementById('btnActionOutEnd');
+
+      const inactiveClass = "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700";
+
+      btnIn.className = `action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${actionName === 'IN (Shift)' ? 'bg-emerald-600 text-white border-emerald-500 shadow-md' : inactiveClass}`;
+      btnOutBreak.className = `action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${actionName === 'OUT (Break)' ? 'bg-amber-600 text-white border-amber-500 shadow-md' : inactiveClass}`;
+      btnInReturn.className = `action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${actionName === 'IN (Return)' ? 'bg-blue-600 text-white border-blue-500 shadow-md' : inactiveClass}`;
+      btnOutEnd.className = `action-btn px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${actionName === 'OUT (Day End)' ? 'bg-rose-600 text-white border-rose-500 shadow-md' : inactiveClass}`;
+
+      focusScannerInput();
+    }
+
+    // --- SCAN SUBMISSION HANDLER ---
+    function handleScanSubmit(event) {
+      if (event) event.preventDefault();
+      const input = document.getElementById('scannerInput');
+      const rawCode = input.value.trim();
+      if (!rawCode) return;
+
+      const empIdClean = rawCode.toUpperCase();
+      let empObj = employeeDb[empIdClean];
+
+      // If unknown ID, generate fallback profile dynamically
+      if (!empObj) {
+        empObj = {
+          name: `Emp (${empIdClean})`,
+          dept: 'Operations',
+          role: 'Staff'
+        };
+      }
+
+      // Calculate Late / On-Time status
+      const now = new Date();
+      const lateInfo = calculateLateStatus(now);
+
+      // Create Attendance Record
+      const logRecord = {
+        id: Date.now(),
+        timestamp: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+        date: now.toISOString().split('T')[0],
+        empId: empIdClean,
+        empName: empObj.name,
+        dept: `${empObj.dept} / ${empObj.role}`,
+        action: selectedAction,
+        lateCalc: (selectedAction === 'IN (Shift)') ? lateInfo.display : '-',
+        isLate: (selectedAction === 'IN (Shift)') ? lateInfo.isLate : false,
+        breakDuration: (selectedAction.includes('Break') || selectedAction.includes('Return')) ? 'Active Track' : '-',
+        syncStatus: webhookUrl ? 'Syncing...' : 'Local'
+      };
+
+      // Add to array
+      attendanceLogs.unshift(logRecord);
+      saveLogsLocal();
+      renderLogsTable();
+      updateMetrics();
+      displayInstantResult(logRecord, empObj);
+
+      // Sync to Google Apps Script if URL set
+      if (webhookUrl) {
+        pushToGoogleSheet(logRecord);
+      }
+
+      // Reset Input
+      input.value = '';
+      focusScannerInput();
+    }
+
+    // --- LATE CALCULATION ALGORITHM ---
+    function calculateLateStatus(scanDate) {
+      const [targetH, targetM] = shiftStartTime.split(':').map(Number);
+      const targetTime = new Date(scanDate);
+      targetTime.setHours(targetH, targetM, 0, 0);
+
+      const cutoffTime = new Date(targetTime.getTime() + graceMinutes * 60000);
+
+      if (scanDate > cutoffTime) {
+        const diffMins = Math.floor((scanDate - targetTime) / 60000);
+        return { isLate: true, display: `Late (${diffMins}m)` };
+      } else {
+        return { isLate: false, display: 'On Time' };
+      }
+    }
+
+    // --- DISPLAY INSTANT SCAN RESULT CARD ---
+    function displayInstantResult(log, empObj) {
+      document.getElementById('scanIdleState').classList.add('hidden');
+      const activeState = document.getElementById('scanActiveState');
+      activeState.classList.remove('hidden');
+
+      document.getElementById('scannedEmpId').textContent = log.empId;
+      document.getElementById('scannedEmpName').textContent = empObj.name;
+      document.getElementById('scannedEmpRole').textContent = `${empObj.dept} • ${empObj.role}`;
+      document.getElementById('scannedActionBadge').textContent = log.action;
+      document.getElementById('scannedTimeDetail').textContent = log.timestamp;
+
+      // Initials for avatar
+      const initials = empObj.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+      document.getElementById('scannedAvatar').textContent = initials;
+
+      const lateDetail = document.getElementById('scannedLateDetail');
+      if (log.isLate) {
+        lateDetail.className = "font-bold text-rose-400 mt-1 flex items-center gap-1.5";
+        lateDetail.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${log.lateCalc}`;
+      } else {
+        lateDetail.className = "font-bold text-emerald-400 mt-1 flex items-center gap-1.5";
+        lateDetail.innerHTML = `<i class="fa-solid fa-check"></i> ${log.lateCalc}`;
+      }
+
+      const badge = document.getElementById('scanStateBadge');
+      badge.textContent = "SCAN VERIFIED";
+      badge.className = "text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+    }
+
+    // --- RENDER LOGS TABLE ---
+    function renderLogsTable() {
+      const tbody = document.getElementById('attendanceLogsTbody');
+      tbody.innerHTML = '';
+
+      const searchVal = document.getElementById('filterSearch').value.toLowerCase();
+      const actionVal = document.getElementById('filterAction').value;
+      const statusVal = document.getElementById('filterStatus').value;
+
+      const filtered = attendanceLogs.filter(log => {
+        const matchesSearch = log.empName.toLowerCase().includes(searchVal) || log.empId.toLowerCase().includes(searchVal);
+        const matchesAction = (actionVal === 'ALL') || (log.action === actionVal);
+        const matchesStatus = (statusVal === 'ALL') || 
+                              (statusVal === 'On Time' && !log.isLate) || 
+                              (statusVal === 'Late' && log.isLate);
+        return matchesSearch && matchesAction && matchesStatus;
+      });
+
+      document.getElementById('logCountDisplay').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="py-8 text-center text-slate-500">
+              No scan logs found matching criteria.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      filtered.forEach((log, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition-colors";
+
+        let actionBadgeClass = "bg-slate-800 text-slate-300 border-slate-700";
+        if (log.action === 'IN (Shift)') actionBadgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+        else if (log.action === 'OUT (Break)') actionBadgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/30";
+        else if (log.action === 'IN (Return)') actionBadgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/30";
+        else if (log.action === 'OUT (Day End)') actionBadgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/30";
+
+        let lateBadgeClass = log.isLate 
+          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-slate-500">${filtered.length - index}</td>
+          <td class="py-3 px-4 font-semibold text-white">
+            <div>${log.timestamp}</div>
+            <div class="text-[10px] text-slate-500 font-sans">${log.date}</div>
+          </td>
+          <td class="py-3 px-4 font-bold text-blue-400">${log.empId}</td>
+          <td class="py-3 px-4 font-sans font-semibold text-slate-200">${log.empName}</td>
+          <td class="py-3 px-4 font-sans text-slate-400 text-[11px]">${log.dept}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${actionBadgeClass}">${log.action}</span>
+          </td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${lateBadgeClass}">${log.lateCalc}</span>
+          </td>
+          <td class="py-3 px-4 text-slate-400 font-sans text-[11px]">${log.breakDuration}</td>
+          <td class="py-3 px-4 text-right">
+            <span class="text-[10px] font-bold ${log.syncStatus === 'Synced' ? 'text-emerald-400' : 'text-slate-500'}">
+              ${log.syncStatus === 'Synced' ? '● Synced' : 'o Local'}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // --- UPDATE DASHBOARD METRICS ---
+    function updateMetrics() {
+      document.getElementById('metricTotalScans').textContent = attendanceLogs.length;
+
+      const uniqueEmps = new Set(attendanceLogs.map(l => l.empId));
+      document.getElementById('metricUniqueEmp').textContent = uniqueEmps.size;
+
+      const onTimeCount = attendanceLogs.filter(l => l.action === 'IN (Shift)' && !l.isLate).length;
+      document.getElementById('metricOnTime').textContent = onTimeCount;
+
+      const lateCount = attendanceLogs.filter(l => l.action === 'IN (Shift)' && l.isLate).length;
+      document.getElementById('metricLate').textContent = lateCount;
+
+      const onBreakCount = attendanceLogs.filter(l => l.action === 'OUT (Break)').length;
+      document.getElementById('metricOnBreak').textContent = onBreakCount;
+    }
+
+    // --- GOOGLE APPS SCRIPT SYNC ---
+    function pushToGoogleSheet(logRecord) {
+      if (!webhookUrl) return;
+
+      fetch(webhookUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logRecord)
+      })
+      .then(() => {
+        logRecord.syncStatus = 'Synced';
+        saveLogsLocal();
+        renderLogsTable();
+      })
+      .catch(err => {
+        console.error("Cloud Sync Error:", err);
+      });
+    }
+
+    function syncFromCloud() {
+      if (!webhookUrl) return;
+
+      fetch(`${webhookUrl}?action=fetchLogs`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.status === 'success' && Array.isArray(data.logs)) {
+          // Merge remote logs if available
+          data.logs.forEach(remoteLog => {
+            if (!attendanceLogs.some(l => l.id == remoteLog.id)) {
+              attendanceLogs.unshift(remoteLog);
+            }
+          });
+          saveLogsLocal();
+          renderLogsTable();
+          updateMetrics();
+        }
+      })
+      .catch(() => {
+        // Silent catch for no-cors limitation handling
+      });
+    }
+
+    function triggerManualSync() {
+      const btn = document.getElementById('btnManualSync');
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-blue-400"></i> Syncing...`;
+      setTimeout(() => {
+        syncFromCloud();
+        btn.innerHTML = `<i class="fa-solid fa-rotate text-blue-400"></i> Sync All Devices`;
+      }, 1000);
+    }
+
+    function checkCloudSyncStatus() {
+      const dot = document.getElementById('cloudSyncDot');
+      const text = document.getElementById('cloudSyncText');
+
+      if (webhookUrl) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping";
+        text.textContent = "Google Sheet Live Sync Active";
+        text.className = "text-emerald-400 font-semibold";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-amber-400";
+        text.textContent = "Local Mode (No Sheet URL)";
+        text.className = "text-amber-400";
+      }
+    }
+
+    // --- LOCAL STORAGE & CONFIG MANAGEMENT ---
+    function saveLogsLocal() {
+      localStorage.setItem('smart_tracker_logs', JSON.stringify(attendanceLogs));
+    }
+
+    function loadSavedConfig() {
+      const savedLogs = localStorage.getItem('smart_tracker_logs');
+      if (savedLogs) {
+        try { attendanceLogs = JSON.parse(savedLogs); } catch(e){}
+      }
+
+      const savedUrl = localStorage.getItem('smart_tracker_webhook');
+      if (savedUrl) webhookUrl = savedUrl;
+
+      const savedShift = localStorage.getItem('smart_tracker_shift');
+      if (savedShift) shiftStartTime = savedShift;
+
+      const savedGrace = localStorage.getItem('smart_tracker_grace');
+      if (savedGrace) graceMinutes = parseInt(savedGrace, 10);
+
+      const savedEmpDb = localStorage.getItem('smart_tracker_emp_db');
+      if (savedEmpDb) {
+        try { employeeDb = JSON.parse(savedEmpDb); } catch(e){}
+      }
+
+      updateShiftUIDisplay();
+    }
+
+    function saveWebhookConfig() {
+      const inputUrl = document.getElementById('webhookUrlInput').value.trim();
+      const inputSheetId = document.getElementById('sheetIdInput').value.trim();
+
+      webhookUrl = inputUrl;
+      localStorage.setItem('smart_tracker_webhook', webhookUrl);
+
+      if (inputSheetId) {
+        sheetId = inputSheetId;
+        document.getElementById('displaySheetId').textContent = sheetId;
+      }
+
+      checkCloudSyncStatus();
+      toggleConfigModal();
+    }
+
+    function saveShiftConfig() {
+      shiftStartTime = document.getElementById('shiftTimeInput').value;
+      graceMinutes = parseInt(document.getElementById('graceMinsInput').value, 10) || 0;
+
+      localStorage.setItem('smart_tracker_shift', shiftStartTime);
+      localStorage.setItem('smart_tracker_grace', graceMinutes);
+
+      updateShiftUIDisplay();
+      toggleShiftModal();
+    }
+
+    function updateShiftUIDisplay() {
+      document.getElementById('cfgDisplayShiftStart').textContent = format12H(shiftStartTime);
+      document.getElementById('cfgDisplayGrace').textContent = `${graceMinutes} Mins`;
+
+      // Late Cutoff Time Calculation
+      const [h, m] = shiftStartTime.split(':').map(Number);
+      const cutoff = new Date();
+      cutoff.setHours(h, m + graceMinutes, 0, 0);
+      document.getElementById('cfgDisplayLateCutoff').textContent = cutoff.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    function saveEmployeeImport() {
+      const text = document.getElementById('importDataInput').value.trim();
+      try {
+        const arr = JSON.parse(text);
+        if (Array.isArray(arr)) {
+          arr.forEach(emp => {
+            if (emp.id) {
+              employeeDb[emp.id.toUpperCase()] = {
+                name: emp.name || emp.id,
+                dept: emp.dept || 'Operations',
+                role: emp.role || 'Staff'
+              };
+            }
+          });
+          localStorage.setItem('smart_tracker_emp_db', JSON.stringify(employeeDb));
+          toggleImportModal();
+        }
+      } catch (err) {
+        // Fallback for CSV format: ID, Name, Dept, Role
+        const lines = text.split('\n');
+        lines.forEach(line => {
+          const parts = line.split(',');
+          if (parts.length >= 2) {
+            const id = parts[0].trim().toUpperCase();
+            employeeDb[id] = {
+              name: parts[1].trim(),
+              dept: parts[2] ? parts[2].trim() : 'Operations',
+              role: parts[3] ? parts[3].trim() : 'Staff'
+            };
+          }
+        });
+        localStorage.setItem('smart_tracker_emp_db', JSON.stringify(employeeDb));
+        toggleImportModal();
+      }
+    }
+
+    // --- UTILITIES ---
+    function initSampleLogs() {
+      attendanceLogs = [
+        {
+          id: 1,
+          timestamp: '09:00:14 AM',
+          date: new Date().toISOString().split('T')[0],
+          empId: 'EMP1040583',
+          empName: 'Rahul Sharma',
+          dept: 'Operations / Staff',
+          action: 'IN (Shift)',
+          lateCalc: 'On Time',
+          isLate: false,
+          breakDuration: '-',
+          syncStatus: 'Synced'
+        },
+        {
+          id: 2,
+          timestamp: '09:53:29 AM',
+          date: new Date().toISOString().split('T')[0],
+          empId: 'EMP0981818',
+          empName: 'Priya Singh',
+          dept: 'Operations / Staff',
+          action: 'IN (Shift)',
+          lateCalc: 'Late (23m)',
+          isLate: true,
+          breakDuration: '-',
+          syncStatus: 'Synced'
+        }
+      ];
+      saveLogsLocal();
+      renderLogsTable();
+      updateMetrics();
+    }
+
+    function clearLogs() {
+      attendanceLogs = [];
+      saveLogsLocal();
+      renderLogsTable();
+      updateMetrics();
+    }
+
+    function exportLogsToCSV() {
+      if (attendanceLogs.length === 0) return;
+
+      let csv = "ID,Scan Time & Date,Emp ID,Employee Name,Department & Role,Action,Late Calculation,Break Duration,Sync Status\n";
+      attendanceLogs.forEach(l => {
+        csv += `"${l.id}","${l.timestamp} ${l.date}","${l.empId}","${l.empName}","${l.dept}","${l.action}","${l.lateCalc}","${l.breakDuration}","${l.syncStatus}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `Attendance_Logs_${new Date().toISOString().split('T')[0]}.csv`);
+      a.click();
+    }
+
+    function simulateCameraScan() {
+      const empIds = Object.keys(employeeDb);
+      const randomId = empIds[Math.floor(Math.random() * empIds.length)];
+      const input = document.getElementById('scannerInput');
+      input.value = randomId;
+      handleScanSubmit();
+    }
+
+    function format12H(time24) {
+      if (!time24) return '09:30 AM';
+      let [h, m] = time24.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+
+    // Modal Toggles
+    function toggleScriptModal() { document.getElementById('scriptModal').classList.toggle('hidden'); }
+    function toggleConfigModal() { 
+      document.getElementById('webhookUrlInput').value = webhookUrl;
+      document.getElementById('configModal').classList.toggle('hidden'); 
+    }
+    function toggleShiftModal() { document.getElementById('shiftModal').classList.toggle('hidden'); }
+    function toggleImportModal() { document.getElementById('importModal').classList.toggle('hidden'); }
+
+    function copyAppsScriptCode() {
+      const code = document.getElementById('appsScriptCodeBlock').innerText;
+      const el = document.createElement('textarea');
+      el.value = code;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      alert('Apps Script Code copied to clipboard!');
+    }
+  </script>
+</body>
+</html>
